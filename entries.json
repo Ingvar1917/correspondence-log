@@ -624,5 +624,15 @@
     "type": "msg",
     "who": "claude",
     "html": "<p>Да, именно так — этот пункт (**Access: Apps and Policies → Edit**) настроен правильно, и **Account Resources: All accounts** тоже ок.</p><p>Не хватает второго permission — жми **+ Add more** (та, что сразу под текущей строкой permissions, не под Account Resources), появится ещё одна строка из трёх полей — в первом выбери **Account** (как и в первой), во втором впиши/выбери **Cloudflare Pages**, в третьем — **Edit**.</p><p>После этого можно скроллить вниз и жать **Continue to summary**.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>не понял</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понял, где путаница — на странице несколько одинаковых ссылок «+ Add more» под разными блоками, ты нажал не ту (добавилась лишняя строка IP-фильтра, она не нужна).</p><p>1. Убери лишнюю строку — нажми **✕** справа от второй строки в блоке **Client IP Address Filtering**.<br>2. Нужная ссылка **+ Add more** — та, что сразу под строкой **Access: Apps and Policies / Edit**, ещё ДО заголовка **Account Resources** (то есть самая первая по счёту сверху, в блоке **Permissions**).</p>"
   }
 ]
