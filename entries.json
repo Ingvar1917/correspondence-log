@@ -494,5 +494,20 @@
     "type": "msg",
     "who": "ihar",
     "html": "<p>поставил</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Отлично, один пункт готов. Теперь нужен второй — доступ к Access.</p><p>Прокрути наверх этого списка и сверни **Developer Platform** (нажми на него ещё раз), потом раскрой **Cloudflare One / Zero Trust** (тем же способом — нажать на строку). Внутри так же по алфавиту поищи пункт со словом **Access** в названии (может быть несколько похожих) — пришли скриншот того, что там найдёшь.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>выцепи плавные идеи для последнего коммита</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Главные идеи последнего коммита в coordinator (<code class=\"inline\">2cb7212</code>, «fixes upload game» — по факту это весь бэкенд пресетов):</p><p>1. **Новый пакет <code class=\"inline\">presets</code>** — глобальный каталог (без привязки к аккаунту), который наполняет админ: серверный архив + клиентские артефакты под Windows/Linux.<br>2. **Ключевое архитектурное решение**: «использовать пресет как билд сервера» не создаёт отдельный билд-пайплайн — вместо этого копирует архив пресета (<code class=\"inline\">S3 CopyObject</code>) в обычный ключ билда индюка и сразу создаёт строку в статусе <code class=\"inline\">uploaded</code>, так что существующий <code class=\"inline\">buildcontroller</code> подхватывает её без единой правки в себе (<code class=\"inline\">builds.Service.InitFromExternalArchive</code>).<br>3. <code class=\"inline\">builds.ObjectStore</code> расширен методами <code class=\"inline\">CopyObject</code>/<code class=\"inline\">PresignDownload</code> (реализовано в S3Store, LocalStore и тестовой заглушке).<br>4. Эндпоинты на два фронта: индюку — каталог/скачивание/«use as build», админу — полный CRUD + загрузка обеих сторон архива.<br>5. Миграция создаёт таблицы <code class=\"inline\">presets</code> и <code class=\"inline\">preset_client_artifacts</code>.<br>6. Полное тестовое покрытие (репозиторий, сервис, оба HTTP-слоя) + обновление <code class=\"inline\">PROJECT_MAP.md</code>.</p><p>Возвращаемся к Cloudflare — жду скриншот раздела **Cloudflare One / Zero Trust** с пунктами про Access.</p>"
   }
 ]
