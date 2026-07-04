@@ -599,5 +599,15 @@
     "type": "msg",
     "who": "ihar",
     "html": "<p>ссылку дай куда проследовать</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прямая ссылка на страницу токенов: **https://dash.cloudflare.com/profile/api-tokens**</p><p>Оттуда: **Create Token** → внизу списка шаблонов найди **Create Custom Token** → на странице создания раскрой (или прокрути до) раздел **Cloudflare One / Zero Trust** в списке permissions и пришли скриншот — покажу, какой именно пункт с Access выбрать.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>вот</p>"
   }
 ]
