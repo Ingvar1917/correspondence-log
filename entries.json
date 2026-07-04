@@ -249,5 +249,10 @@
     "type": "msg",
     "who": "claude",
     "html": "<p>Прямая ссылка: **https://ingvar1917.github.io/correspondence-log/** — просто открой в браузере, логин не нужен, обновляется сама.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>привет</p>"
   }
 ]
