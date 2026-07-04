@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Рабочий журнал — Ihar × Claude</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --ink: #1b2430;
+    --ink-soft: #4b5768;
+    --ink-faint: #7c8798;
+    --rule: #ccd4dc;
+    --rule-strong: #aab5c0;
+    --ihar: #9c6b14;
+    --ihar-bg: #f4e9d2;
+    --claude: #2f6f7f;
+    --claude-bg: #dcebee;
+    --code-bg: #e2e7ec;
+    --code-border: #c6ced6;
+    --live-dot: #2f8f5b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --ink: #e6e9ed; --ink-soft: #9aa4b0; --ink-faint: #6b7481;
+      --rule: #2a323c; --rule-strong: #3a4450;
+      --ihar: #dbac54; --ihar-bg: #2c2413;
+      --claude: #7ec1d1; --claude-bg: #142a2f;
+      --code-bg: #1a2027; --code-border: #2a323c;
+      --live-dot: #4fbf83;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --ink: #e6e9ed; --ink-soft: #9aa4b0; --ink-faint: #6b7481;
+    --rule: #2a323c; --rule-strong: #3a4450;
+    --ihar: #dbac54; --ihar-bg: #2c2413;
+    --claude: #7ec1d1; --claude-bg: #142a2f;
+    --code-bg: #1a2027; --code-border: #2a323c;
+    --live-dot: #4fbf83;
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --ink: #1b2430; --ink-soft: #4b5768; --ink-faint: #7c8798;
+    --rule: #ccd4dc; --rule-strong: #aab5c0;
+    --ihar: #9c6b14; --ihar-bg: #f4e9d2;
+    --claude: #2f6f7f; --claude-bg: #dcebee;
+    --code-bg: #e2e7ec; --code-border: #c6ced6;
+    --live-dot: #2f8f5b;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--paper); color: var(--ink);
+    font-family: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 17px; line-height: 1.65;
+  }
+  .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace; }
+  a { color: var(--claude); }
+  header.masthead {
+    position: sticky; top: 0; z-index: 10; background: var(--paper);
+    border-bottom: 1px solid var(--rule);
+  }
+  .masthead-inner {
+    max-width: 760px; margin: 0 auto; padding: 18px 24px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .masthead h1 {
+    font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    margin: 0; font-weight: 600;
+  }
+  .masthead .sub { font-size: 12.5px; color: var(--ink-faint); font-family: ui-monospace, monospace; }
+  .status {
+    display: flex; align-items: center; gap: 6px; font-size: 11.5px;
+    font-family: ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--ink-soft);
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--live-dot);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+  main { max-width: 760px; margin: 0 auto; padding: 8px 24px 120px; }
+  .preamble { padding: 28px 0 8px; color: var(--ink-soft); font-size: 15px; max-width: 62ch; }
+  .preamble p { margin: 0 0 12px; }
+  .divider { display: flex; align-items: center; gap: 12px; margin: 44px 0 20px; color: var(--ink-faint); }
+  .divider .label {
+    font-family: ui-monospace, monospace; font-size: 11.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .divider .line { flex: 1; height: 1px; background: var(--rule); }
+  .entry { padding: 18px 0; border-bottom: 1px solid var(--rule); animation: fadein 0.4s ease; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { .entry { animation: none; } }
+  .entry:last-child { border-bottom: none; }
+  .meta {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .tag { padding: 2px 7px; border-radius: 3px; font-weight: 600; }
+  .tag--ihar { background: var(--ihar-bg); color: var(--ihar); }
+  .tag--claude { background: var(--claude-bg); color: var(--claude); }
+  .entry .body { max-width: 66ch; }
+  .entry .body p { margin: 0 0 12px; }
+  .entry .body p:last-child { margin-bottom: 0; }
+  .note { font-size: 14.5px; color: var(--ink-soft); border-left: 2px solid var(--rule-strong); padding-left: 12px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px;
+    padding: 12px 14px; overflow-x: auto; margin: 10px 0 14px;
+  }
+  pre, code { font-family: ui-monospace, monospace; font-size: 13.5px; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 3px; padding: 0.1em 0.4em; font-size: 0.88em; }
+  pre code { background: none; border: none; padding: 0; }
+  footer {
+    max-width: 760px; margin: 0 auto; padding: 24px 24px 60px; color: var(--ink-faint);
+    font-size: 12.5px; font-family: ui-monospace, monospace; border-top: 1px solid var(--rule);
+  }
+  #empty { padding: 40px 0; color: var(--ink-faint); font-family: ui-monospace, monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-inner">
+    <div>
+      <h1>Рабочий журнал</h1>
+      <div class="sub">coordinator · Agones BaaS</div>
+    </div>
+    <div class="status"><span class="live-dot"></span><span id="status-text">подключение…</span></div>
+  </div>
+</header>
+<main>
+  <div class="preamble">
+    <p><strong>Что это.</strong> Живой журнал переписки за рабочими сессиями — что архитектор просит, что ассистент делает и как отчитывается. Страница сама подтягивает новые записи каждые 15 секунд, перезагружать не нужно.</p>
+    <p>Служебные детали (полные логи команд, дампы) сокращены до сути — здесь то, о чём договаривались и что было сказано. Секреты/токены, засветившиеся в сессиях, в записи не попадают.</p>
+  </div>
+  <div id="log"></div>
+  <div id="empty" style="display:none">записей пока нет</div>
+</main>
+<footer>обновляется автоматически · coordinator (Agones BaaS)</footer>
+
+<script>
+(function () {
+  var log = document.getElementById('log');
+  var emptyMsg = document.getElementById('empty');
+  var statusText = document.getElementById('status-text');
+  var rendered = 0;
+
+  function render(entries) {
+    if (!entries.length) { emptyMsg.style.display = 'block'; return; }
+    emptyMsg.style.display = 'none';
+    for (; rendered < entries.length; rendered++) {
+      var e = entries[rendered];
+      var el = document.createElement('div');
+      if (e.type === 'divider') {
+        el.className = 'divider';
+        el.innerHTML = '<span class="label"></span><span class="line"></span>';
+        el.querySelector('.label').textContent = e.label;
+      } else {
+        el.className = 'entry';
+        var tagClass = e.who === 'ihar' ? 'tag--ihar' : 'tag--claude';
+        var tagText = e.who === 'ihar' ? 'Ihar' : 'Claude';
+        var meta = document.createElement('div');
+        meta.className = 'meta';
+        var tag = document.createElement('span');
+        tag.className = 'tag ' + tagClass;
+        tag.textContent = tagText;
+        meta.appendChild(tag);
+        var body = document.createElement('div');
+        body.className = 'body';
+        body.innerHTML = e.html;
+        el.appendChild(meta);
+        el.appendChild(body);
+      }
+      log.appendChild(el);
+    }
+  }
+
+  function poll() {
+    fetch('entries.json?_=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (entries) {
+        render(entries);
+        statusText.textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
+      })
+      .catch(function () {
+        statusText.textContent = 'нет связи, повтор через 15с';
+      });
+  }
+
+  poll();
+  setInterval(poll, 15000);
+})();
+</script>
+</body>
+</html>
