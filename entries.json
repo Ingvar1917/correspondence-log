@@ -609,5 +609,20 @@
     "type": "msg",
     "who": "ihar",
     "html": "<p>вот</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Отлично, ты на нужной странице (токенов пока нет — это нормально, прошлая попытка не сохранилась). Жми синюю кнопку **+ Create Token** в правом верхнем углу.</p><p>На следующей странице внизу списка шаблонов будет **Create Custom Token** — выбери его, и там уже:<br>1. В поиске permissions впиши **pages**, найди **Cloudflare Pages** → поставь **Edit**<br>2. Добавь ещё permission (кнопка **+ Add permission** под первой строкой) — впиши **access**, найди пункт с **Apps and Policies** в названии → **Edit**<br>3. Ресурс — **Entire Account**<br>4. **Continue to summary** → **Create Token**<br>5. Скопируй и пришли токен сюда</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>так?</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Да, именно так — этот пункт (**Access: Apps and Policies → Edit**) настроен правильно, и **Account Resources: All accounts** тоже ок.</p><p>Не хватает второго permission — жми **+ Add more** (та, что сразу под текущей строкой permissions, не под Account Resources), появится ещё одна строка из трёх полей — в первом выбери **Account** (как и в первой), во втором впиши/выбери **Cloudflare Pages**, в третьем — **Edit**.</p><p>После этого можно скроллить вниз и жать **Continue to summary**.</p>"
   }
 ]
