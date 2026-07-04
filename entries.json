@@ -554,5 +554,25 @@
     "type": "msg",
     "who": "claude",
     "html": "<p>Точно, все остальные коммиты на английском — поправляю.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — <code class=\"inline\">40e0a62 presets: boilerplate catalog + use-as-server-build pipeline</code>, теперь на английском.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделай коммит остальных файлов</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — <code class=\"inline\">bf0f15c presets: indie UI (PresetPicker, /presets page) + local e2e build pipeline test</code>, 15 файлов. Пуш оставляю тебе, как договорились. Проверь <code class=\"inline\">git status</code>:</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Рабочее дерево чистое. Возвращаемся к Cloudflare, когда будет удобно.</p>"
   }
 ]
