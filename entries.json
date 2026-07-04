@@ -254,5 +254,45 @@
     "type": "msg",
     "who": "ihar",
     "html": "<p>привет</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Привет! На чём продолжим — что-то по коду coordinator, или другое?</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>https://ingvar1917.github.io/correspondence-log/ тут нет обновлений, я хочу live</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл причину — сборка GitHub Pages **нестабильно валится** (<code class=\"inline\">Page build failed</code>, без деталей) из-за Jekyll, который по умолчанию пытается обработать файлы как Jekyll-сайт. Сайт то собирается, то нет — отсюда и рассинхрон с реальным содержимым. Добавляю <code class=\"inline\">.nojekyll</code>, это стандартный фикс для простых статических сайтов.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>OAuth-токену <code class=\"inline\">gh</code> не хватает scope <code class=\"inline\">workflow</code> для пуша воркфлоу — придётся обойтись без GitHub Actions. Откатываю эту попытку и проверяю, помог ли уже запушенный <code class=\"inline\">.nojekyll</code> сам по себе (без него legacy-сборка иногда падала на Jekyll).</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь проверяю, стабилизировала ли <code class=\"inline\">.nojekyll</code> сборку.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собралось успешно с <code class=\"inline\">.nojekyll</code>. Финальная проверка живого содержимого.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Догнало — 53/53, совпадает с локальным, последняя запись даже включает твоё «привет». Обновлю память фактом про <code class=\"inline\">.nojekyll</code> и закрою задачу.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Починил и подтвердил: **https://ingvar1917.github.io/correspondence-log/** сейчас показывает 53/53 записей, включая твоё «привет».</p><p>Причина отставания: у GitHub Pages «legacy»-сборщик по умолчанию гоняет всё через Jekyll и на этом плоском HTML/JS/JSON-сайте сборка иногда падала без внятной причины («Page build failed», один и тот же коммит то собирался, то нет) — сайт молча отставал от реального содержимого репозитория. Добавил <code class=\"inline\">.nojekyll</code> — с ним сборки перестали падать. Записал это в память вместе с признаком «если снова разъедется — сначала проверяй статус сборки Pages, это не проблема хука».</p>"
   }
 ]
