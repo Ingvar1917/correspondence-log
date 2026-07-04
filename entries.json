@@ -444,5 +444,20 @@
     "type": "msg",
     "who": "ihar",
     "html": "<p>куда дальше?</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Аккаунт создан, отлично. Дальше — создать API-токен:</p><p>Проще всего — используй поиск сверху слева («Quick search... Ctrl K»), впиши **API Tokens** и перейди по результату. Откроется страница токенов.</p><p>Там:<br>1. Нажми **Create Token**<br>2. Выбери **Custom token** (внизу списка шаблонов, &quot;Create Custom Token&quot;)<br>3. Под **Permissions** добавь два пункта (в первом дропдауне выбирай **Account**, не **Zone**):<br>   - <code class=\"inline\">Cloudflare Pages</code> → <code class=\"inline\">Edit</code><br>   - <code class=\"inline\">Access: Apps and Policies</code> → <code class=\"inline\">Edit</code><br>4. Под **Account Resources** — выбери именно свой аккаунт (Korolisimus@gmail.com&#x27;s Account)<br>5. Continue to summary → **Create Token**<br>6. Скопируй токен (показывается один раз) и пришли сюда</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>че делать?</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Используй строку поиска **«Search for permission groups...»** прямо на этой странице — так быстрее, чем искать по категориям:</p><p>1. Впиши в поиск **pages** → появится пункт вроде **Cloudflare Pages** — выбери у него уровень **Edit**.<br>2. Сотри и впиши **access** → появится несколько пунктов с «Access» в названии — найди **Access: Apps and Policies** (может называться близко к этому) — тоже выбери **Edit**.<br>3. После добавления обоих — внизу должна появиться кнопка **Add another policy** или сразу **Continue to summary** — жми **Continue to summary**, потом **Create Token**.<br>4. Скопируй токен и пришли сюда.</p><p>Если по «access» вылезет непонятный список — кинь скриншот, подскажу, какой именно пункт нужен.</p>"
   }
 ]
