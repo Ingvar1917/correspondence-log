@@ -579,5 +579,15 @@
     "type": "msg",
     "who": "ihar",
     "html": "<p>нужна команда чо бы установился весь стек для прокта</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Одна команда, которая поднимает весь стек с нуля:</p><pre><code>\nmake dev-up\n</code></pre><p>Это создаёт kind-кластер <code class=\"inline\">coordinator-dev</code> целиком: Postgres, миграции, Agones + metrics-server, MinIO, registry, нужные образы (<code class=\"inline\">.env</code> у тебя уже есть, <code class=\"inline\">make dev-secret</code> вызывается автоматически внутри). Секунд на несколько минут при первом разе.</p><p>После этого для повседневной разработки (с горячей перезагрузкой фронта) — сверху:</p><pre><code>\nmake dev-stack\n</code></pre><p>Она поднимает локальный бинарь coordinator + оба Vite dev-сервера поверх Postgres того же dev-кластера (ссылки на порты выведет в терминал).</p><p>Если когда-то нужно снести и поднять с чистого листа — <code class=\"inline\">make dev-down &amp;&amp; make dev-up</code> (обнуляет Postgres).</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>ты что тро спросил?</p>"
   }
 ]
