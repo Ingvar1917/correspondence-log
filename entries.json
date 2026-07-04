@@ -544,5 +544,15 @@
     "type": "msg",
     "who": "claude",
     "html": "<p>Держи ровно ту строку, что уже стоит в коммите — можешь просто скопировать:</p><pre><code>\ngit commit --amend -m &quot;presets: боилерплейт-каталог + use-as-server-build pipeline&quot;\n</code></pre><p>Но учти: сообщение уже поменял я сам (это была правка существующего коммита, не новый), и коммит на диске сейчас называется именно так — <code class=\"inline\">908cca5 presets: боилерплейт-каталог + use-as-server-build pipeline</code>. Если у тебя тот же самый repo (та же папка <code class=\"inline\">/home/ihar/Games/coordinator</code>), запуск <code class=\"inline\">git commit -m &quot;...&quot;</code> сейчас ничего не закоммитит (rabочее дерево для этого коммита уже чистое) — просто <code class=\"inline\">git log -1</code> покажет, что название уже применено.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>бер русских слов в сообщениях</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Точно, все остальные коммиты на английском — поправляю.</p>"
   }
 ]
