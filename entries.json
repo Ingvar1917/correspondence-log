@@ -304,5 +304,20 @@
     "type": "msg",
     "who": "claude",
     "html": "<p>Привет! Продолжаем что-то по coordinator, или другое на уме?</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>https://ingvar1917.github.io/correspondence-log/<br>там нет нашего диалогоа почему?</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>[Request interrupted by user]</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>вижу есть, нужно было обновить станицу</p>"
   }
 ]
