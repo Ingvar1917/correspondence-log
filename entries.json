@@ -669,5 +669,45 @@
     "type": "msg",
     "who": "claude",
     "html": "<p>Подтвердил делом: к <code class=\"inline\">07:04:07</code> дублирующиеся тики исчезли — теперь ровно один тик раз в 30с (было по два). Последние пары <code class=\"inline\">07:03:07</code>/<code class=\"inline\">07:03:37</code> — это ещё догоревшие записи от пода, который в момент scale-down уже был в процессе тика.</p><p>Итог:<br>- Скрипт <code class=\"inline\">deploy/local/dev-stack.sh</code> поправлен: гасит in-cluster <code class=\"inline\">app</code> на время своей работы, возвращает обратно при выходе (Ctrl+C/cleanup)<br>- Прямо сейчас применил вручную то же самое к уже запущенным процессам — реальный темп записи метрик упал вдвое, проверено по факту<br>- <code class=\"inline\">CLAUDE.md</code> обновлён с объяснением почему это важно</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>нужно чистить старые метрики, что бы контролировать размер базы</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь методы retention в репозитории.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь провожу в <code class=\"inline\">main.go</code>.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тесты и проверка сборки.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собирается. Теперь тест для <code class=\"inline\">DeleteOlderThan</code>/<code class=\"inline\">RunGC</code>.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба теста прошли. Прогоняю полный набор, чтобы ничего не задеть.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Обновляю <code class=\"inline\">PROJECT_MAP.md</code> — закрываю известный риск.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Что сделано:</p><p>- **Миграция 000028** — индекс <code class=\"inline\">idx_gameserver_metrics_collected_at</code> (без него bulk-delete по возрасту шёл бы full scan&#x27;ом — существующий индекс начинается с <code class=\"inline\">game_id</code>, не годится для чистки по всем играм разом)<br>- **<code class=\"inline\">metrics.Repository.DeleteOlderThan</code> + <code class=\"inline\">RunGC</code>** — та же схема, что уже используется в <code class=\"inline\">builds.Service.RunGC</code> (тикер, лог, чистый выход по отмене контекста)<br>- **<code class=\"inline\">main.go</code>**: <code class=\"inline\">METRICS_RETENTION</code> (по умолчанию 7 дней) и <code class=\"inline\">METRICS_GC_INTERVAL</code> (15 мин), один глобальный цикл (не на кластер — возраст снапшота не зависит от того, каким кластером он собран)<br>- Тесты: <code class=\"inline\">DeleteOlderThan</code> (граница ровно по cutoff, повторный проход — no-op) + <code class=\"inline\">RunGC</code> (останавливается по отмене контекста) — все зелёные, <code class=\"inline\">make test-short</code>/<code class=\"inline\">make test</code> тоже<br>- <code class=\"inline\">PROJECT_MAP.md</code>: закрыл риск retention для метрик, отдельно зафиксировал находку про задвоение записи (in-cluster app + dev-stack) — уже почищено скриптом ранее сегодня</p><p>Осталось нетронутым: <code class=\"inline\">log_tail</code> (та же категория риска, но отдельная задача — не просил), rollup/сжатие старых метрик (сейчас просто удаляются, не агрегируются).</p>"
   }
 ]
