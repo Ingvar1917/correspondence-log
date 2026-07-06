@@ -5147,5 +5147,53 @@
     "who": "claude",
     "html": "<p>Убрал <code class=\"inline\">confirm()</code> и из Delete, и из Deactivate (backend уже проверен через curl — работает, значит дело было именно в диалоге). Все тесты фронта зелёные (74/74), Vite подхватит сам через HMR — обнови страницу и попробуй ещё раз.</p><p>Кстати, у кнопки удаления игры в Settings (danger zone) тоже стоит <code class=\"inline\">confirm()</code> — раз в твоём браузере это стабильно ломается, вероятно там тоже будет «не работает». Убрать превентивно и там, или подождать, пока реально столкнёшься?</p>",
     "ts": "2026-07-06T11:37:58.374Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>не работает кнопка Use as server build</p>",
+    "ts": "2026-07-06T11:38:43.670Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тот же паттерн — уберу <code class=\"inline\">confirm()</code> и здесь.</p>",
+    "ts": "2026-07-06T11:38:58.083Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тесты, где стабился <code class=\"inline\">confirm</code> для этого сценария.</p>",
+    "ts": "2026-07-06T11:39:31.171Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Убираю ненужные <code class=\"inline\">stubGlobal(&#x27;confirm&#x27;, ...)</code> и весь тест «отказ в confirm».</p>",
+    "ts": "2026-07-06T11:39:56.112Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">PresetsPage.test.tsx</code>.</p>",
+    "ts": "2026-07-06T11:40:24.382Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю typecheck и весь фронт-набор.</p>",
+    "ts": "2026-07-06T11:40:37.374Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нет дубля в админке. Готово: <code class=\"inline\">confirm()</code> убран и с кнопки Presets («Use as server build», и в <code class=\"inline\">/presets</code>, и в Builds-вкладке) — та же причина, что и раньше. Весь фронт-набор зелёный (73/73), типы чистые.</p>",
+    "ts": "2026-07-06T11:41:02.908Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Vite подхватит сам через HMR — обнови страницу и попробуй ещё раз. Учитывая, что это уже четвёртая кнопка с той же проблемой (Stop, Delete/Deactivate билда, теперь пресеты), думаю стоит на всякий случай убрать <code class=\"inline\">confirm()</code> и с danger-zone-удаления игры в Settings, не дожидаясь отдельного репорта — согласен?</p>",
+    "ts": "2026-07-06T11:41:13.881Z"
   }
 ]
