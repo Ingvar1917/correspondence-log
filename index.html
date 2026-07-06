@@ -114,7 +114,7 @@
     max-width: 760px; margin: 0 auto; padding: 24px 24px 60px; color: var(--ink-faint);
     font-size: 12.5px; font-family: ui-monospace, monospace; border-top: 1px solid var(--rule);
   }
-  #empty { padding: 40px 0; color: var(--ink-faint); font-family: ui-monospace, monospace; font-size: 13px; }
+  #empty, #log-start { padding: 40px 0; color: var(--ink-faint); font-family: ui-monospace, monospace; font-size: 13px; text-align: center; }
 </style>
 </head>
 <body>
@@ -129,56 +129,108 @@
 </header>
 <main>
   <div class="preamble">
-    <p><strong>Что это.</strong> Живой журнал переписки за рабочими сессиями — что архитектор просит, что ассистент делает и как отчитывается. Страница сама подтягивает новые записи каждые 15 секунд, перезагружать не нужно.</p>
+    <p><strong>Что это.</strong> Живой журнал переписки за рабочими сессиями — что архитектор просит, что ассистент делает и как отчитывается. Новые записи — наверху, страница сама подтягивает их каждые 15 секунд. Более старые подгружаются по мере прокрутки вниз.</p>
     <p>Служебные детали (полные логи команд, дампы) сокращены до сути — здесь то, о чём договаривались и что было сказано. Секреты/токены, засветившиеся в сессиях, в записи не попадают.</p>
   </div>
   <div id="log"></div>
   <div id="empty" style="display:none">записей пока нет</div>
+  <div id="log-start" style="display:none">— начало журнала —</div>
 </main>
 <footer>обновляется автоматически · coordinator (Agones BaaS)</footer>
 
 <script>
 (function () {
+  var PAGE_SIZE = 25;
   var log = document.getElementById('log');
   var emptyMsg = document.getElementById('empty');
+  var logStart = document.getElementById('log-start');
   var statusText = document.getElementById('status-text');
-  var rendered = 0;
 
-  function render(entries) {
-    if (!entries.length) { emptyMsg.style.display = 'block'; return; }
-    emptyMsg.style.display = 'none';
-    for (; rendered < entries.length; rendered++) {
-      var e = entries[rendered];
-      var el = document.createElement('div');
-      if (e.type === 'divider') {
-        el.className = 'divider';
-        el.innerHTML = '<span class="label"></span><span class="line"></span>';
-        el.querySelector('.label').textContent = e.label;
-      } else {
-        el.className = 'entry';
-        var tagClass = e.who === 'ihar' ? 'tag--ihar' : 'tag--claude';
-        var tagText = e.who === 'ihar' ? 'Ihar' : 'Claude';
-        var meta = document.createElement('div');
-        meta.className = 'meta';
-        var tag = document.createElement('span');
-        tag.className = 'tag ' + tagClass;
-        tag.textContent = tagText;
-        meta.appendChild(tag);
-        var body = document.createElement('div');
-        body.className = 'body';
-        body.innerHTML = e.html;
-        el.appendChild(meta);
-        el.appendChild(body);
-      }
-      log.appendChild(el);
+  var entries = [];       // полный массив с сервера, от старых к новым
+  var newestKnown = 0;    // сколько записей сверху уже отрисовано (граница, не включительно)
+  var oldestRendered = 0; // индекс самой старой отрисованной записи (включительно)
+
+  function buildEntryEl(e) {
+    var el = document.createElement('div');
+    if (e.type === 'divider') {
+      el.className = 'divider';
+      el.innerHTML = '<span class="label"></span><span class="line"></span>';
+      el.querySelector('.label').textContent = e.label;
+    } else {
+      el.className = 'entry';
+      var tagClass = e.who === 'ihar' ? 'tag--ihar' : 'tag--claude';
+      var tagText = e.who === 'ihar' ? 'Ihar' : 'Claude';
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var tag = document.createElement('span');
+      tag.className = 'tag ' + tagClass;
+      tag.textContent = tagText;
+      meta.appendChild(tag);
+      var body = document.createElement('div');
+      body.className = 'body';
+      body.innerHTML = e.html;
+      el.appendChild(meta);
+      el.appendChild(body);
     }
+    return el;
   }
+
+  // Поллинг увидел, что entries.json подрос — новые (более свежие) записи
+  // всегда вставляются над всем, что уже отрисовано.
+  function prependNewest(uptoExclusive) {
+    var frag = document.createDocumentFragment();
+    for (var i = uptoExclusive - 1; i >= newestKnown; i--) {
+      frag.appendChild(buildEntryEl(entries[i]));
+    }
+    log.insertBefore(frag, log.firstChild);
+    newestKnown = uptoExclusive;
+  }
+
+  // Дописывает следующую (более старую) страницу записей внизу ленты.
+  // Общая точка входа и для первой отрисовки, и для скролла вниз.
+  function loadOlderPage() {
+    if (oldestRendered <= 0) return;
+    var start = Math.max(0, oldestRendered - PAGE_SIZE);
+    var frag = document.createDocumentFragment();
+    for (var i = oldestRendered - 1; i >= start; i--) {
+      frag.appendChild(buildEntryEl(entries[i]));
+    }
+    log.appendChild(frag);
+    oldestRendered = start;
+    logStart.style.display = oldestRendered <= 0 ? 'block' : 'none';
+  }
+
+  function nearBottom() {
+    return window.innerHeight + window.scrollY >= document.body.offsetHeight - 600;
+  }
+
+  function maybeLoadMore() {
+    if (oldestRendered <= 0 || !nearBottom()) return;
+    loadOlderPage();
+  }
+
+  window.addEventListener('scroll', maybeLoadMore);
+  window.addEventListener('resize', maybeLoadMore);
 
   function poll() {
     fetch('entries.json?_=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
-      .then(function (entries) {
-        render(entries);
+      .then(function (data) {
+        entries = data;
+        if (!entries.length) {
+          emptyMsg.style.display = 'block';
+        } else {
+          emptyMsg.style.display = 'none';
+          if (newestKnown === 0 && oldestRendered === 0) {
+            // первая успешная загрузка — открыть последнюю (самую свежую) страницу
+            oldestRendered = entries.length;
+            newestKnown = entries.length;
+            loadOlderPage();
+          } else if (entries.length > newestKnown) {
+            prependNewest(entries.length);
+          }
+          maybeLoadMore();
+        }
         statusText.textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
       })
       .catch(function () {
