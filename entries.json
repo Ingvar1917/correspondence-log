@@ -5387,5 +5387,95 @@
     "who": "claude",
     "html": "<p>Готово. Убрал <code class=\"inline\">confirm()</code> со всех оставшихся кнопок в indie-дашборде (Activate, restart сессии, перевыпуск API-ключа, удаление региона, удаление игры, смена тарифа) — итого 6 кнопок в этот раз, плюс 4 раньше. Vite подхватит через HMR.</p><p>В <code class=\"inline\">admindashboardui</code> нашёл ещё 7 таких же мест (<code class=\"inline\">ClusterPage</code>, <code class=\"inline\">GamesPage</code> ×3, <code class=\"inline\">ClustersPage</code> ×3) — та же админка, которой ты, возможно, пока не пользуешься активно. Чинить и там сейчас или подождать?</p>",
     "ts": "2026-07-06T11:57:36.049Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>чини, только вместо confirm делай кастомную модалку для подтверждения</p>",
+    "ts": "2026-07-06T11:58:16.370Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю i18n-ключи и подключаю провайдер в <code class=\"inline\">App.tsx</code>.</p>",
+    "ts": "2026-07-06T11:59:51.739Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю тестовый хелпер <code class=\"inline\">renderPage</code>, чтобы он тоже оборачивал <code class=\"inline\">ConfirmProvider</code>.</p>",
+    "ts": "2026-07-06T12:00:35.491Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь переношу все 7 точек на <code class=\"inline\">useConfirm()</code>. Начну с <code class=\"inline\">ClusterPage.tsx</code>.</p>",
+    "ts": "2026-07-06T12:00:57.101Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">GamesPage.tsx</code>.</p>",
+    "ts": "2026-07-06T12:01:20.155Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">ClustersPage.tsx</code> — три места, две функции-компонента.</p>",
+    "ts": "2026-07-06T12:01:41.432Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">ProvisionSection</code> (отдельный компонент в том же файле).</p>",
+    "ts": "2026-07-06T12:02:07.458Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую и проверяю типы.</p>",
+    "ts": "2026-07-06T12:02:25.761Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Типы чистые. Теперь гоняю существующие тесты — они наверняка стабят <code class=\"inline\">window.confirm</code>, надо переписать на клики по модалке.</p>",
+    "ts": "2026-07-06T12:02:33.332Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, совпадает. Правлю оставшиеся три места.</p>",
+    "ts": "2026-07-06T12:03:26.834Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Гоняю весь набор.</p>",
+    "ts": "2026-07-06T12:03:51.944Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю тест на отмену через модалку (кнопка Cancel) — путь <code class=\"inline\">false</code> пока нигде не проверен.</p>",
+    "ts": "2026-07-06T12:04:03.281Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальная проверка обоих фронтов.</p>",
+    "ts": "2026-07-06T12:04:47.611Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю <code class=\"inline\">ADMIN_UI_MAP.md</code> — новый переиспользуемый компонент стоит зафиксировать как конвенцию.</p>",
+    "ts": "2026-07-06T12:05:12.170Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>**Новый компонент** <code class=\"inline\">admindashboardui/src/components/ConfirmDialog.tsx</code> — <code class=\"inline\">ConfirmProvider</code> (смонтирован в корне <code class=\"inline\">App.tsx</code>) + <code class=\"inline\">useConfirm()</code>, возвращающий <code class=\"inline\">Promise&lt;boolean&gt;</code> (замена <code class=\"inline\">window.confirm</code> с тем же эргономичным API — <code class=\"inline\">if (await confirm(msg))</code>).</p><p>**Перенесены все 7 мест**: scale Fleet&#x27;а, suspend/unsuspend/suspend+stop (GamesPage), drain/undrain, provision нового кластера.</p><p>**Тесты**: <code class=\"inline\">test/helpers.tsx</code>&#x27;s <code class=\"inline\">renderPage</code> теперь сам оборачивает <code class=\"inline\">ConfirmProvider</code>; все существующие тесты переписаны на клик по модалке вместо стаба <code class=\"inline\">window.confirm</code>; добавлен новый тест на путь Cancel (не было покрыто раньше вообще).</p><p>Полный прогон: <code class=\"inline\">tsc --noEmit</code> чистый, <code class=\"inline\">12/12</code> тестов в admindashboardui, <code class=\"inline\">72/72</code> в dashboardui (не задет). Задокументировал конвенцию в <code class=\"inline\">ADMIN_UI_MAP.md</code>.</p>",
+    "ts": "2026-07-06T12:05:41.156Z"
   }
 ]
