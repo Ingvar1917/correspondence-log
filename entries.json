@@ -4883,5 +4883,23 @@
     "who": "claude",
     "html": "<p>Готово — регион <code class=\"inline\">dev</code> добавлен, launch прошёл. Можешь проверять статус деплоя в UI (Overview → live-статус).</p>",
     "ts": "2026-07-06T11:06:21.180Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>The server listens on port 7777, 8080, 8765, 9357, 9358, but settings say otherwise — looks like a GAME_PORT typo.</p>",
+    "ts": "2026-07-06T11:07:40.721Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл причину — это не баг, а известное ограничение проекта: смена <code class=\"inline\">game_port</code> **после** запуска не обновляет уже созданный Fleet (Fleet создаётся один раз при launch, live-обновление не реализовано — тот же риск, что и с обновлением образа). Ты запустил игру, когда порт ещё был <code class=\"inline\">777</code> (опечатка), потом поправил на <code class=\"inline\">7777</code> в Settings — а в уже работающем поде осталась старая переменная <code class=\"inline\">GAME_PORT=777</code>. Поэтому bridge-sidecar видит «777 не отвечает, а реально слушают 7777/8080/8765/9357/9358» — и 7777 туда тоже попадает, потому что для запущенного пода конфиг ещё старый.</p><p>Чиню — stop + launch заново, чтобы Fleet пересоздался с актуальным портом.</p>",
+    "ts": "2026-07-06T11:09:16.330Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово: <code class=\"inline\">Ready</code>, <code class=\"inline\">unexpected_listening_ports</code> больше нет — после пересоздания Fleet&#x27;а с правильным <code class=\"inline\">GAME_PORT=7777</code> всё сошлось.</p><p>Стоит иметь в виду на будущее: смена <code class=\"inline\">game_port</code> (и вообще любого поля Fleet-спеки) на уже запущенной игре требует **stop + launch** заново, простое сохранение в Settings не подхватывается автоматически — это известное ограничение (риск №8 в PROJECT_MAP.md), relaunch «на лету» ещё не реализован.</p>",
+    "ts": "2026-07-06T11:09:40.428Z"
   }
 ]
