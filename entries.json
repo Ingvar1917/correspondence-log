@@ -4649,5 +4649,137 @@
     "who": "claude",
     "html": "<p>Проверка закончена — нашёл два подтверждённых бага (не просто теоретических, воспроизвёл вживую на реальном kind-кластере) и одну штатно работающую защиту.</p><p>**❌ Баг №1 — удаление игры не останавливает Fleet.** Запустил тестовую игру (реальный Fleet в k8s), затем <code class=\"inline\">DELETE /games/{id}</code> **без** предварительного stop. Результат: строка игры и её регионы корректно удалились из Postgres (каскад отработал), но Fleet в k8s остался жить как ни в чём не бывало. После удаления игры позвать <code class=\"inline\">stop</code> уже нельзя («game not found») — Fleet осиротел навсегда, без единого способа найти и убрать его через API. Причина в коде: <code class=\"inline\">games.Repository.Delete</code> — голый <code class=\"inline\">DELETE FROM games</code>, с комментарием в коде **«no live-Fleet teardown (nothing creates Fleets yet)»** — утверждение, которое было верным когда-то, но давно устарело (лаунчер создаёт Fleet&#x27;ы уже давно).</p><p>**❌ Баг №2 — то же самое для удаления региона.** <code class=\"inline\">DELETE /games/{id}/regions/{region}</code> на запущенном регионе: строка <code class=\"inline\">game_regions</code> (включая <code class=\"inline\">cluster_id</code> — единственное место, где хранилось, в каком кластере Fleet) удаляется, а сам Fleet — нет. Теряется даже след, в каком кластере искать сироту.</p><p>**✅ Работает как надо — стоп и удаление билда.** <code class=\"inline\">POST /games/{id}/stop</code> реально удаляет Fleet (проверил: был → нет). <code class=\"inline\">DELETE /games/{id}/builds/{build_id}</code> на активном билде корректно отбивается <code class=\"inline\">409 build_active</code>.</p><p>Оба бага — один и тот же паттерн: удаление трогает только БД, никогда не зовёт <code class=\"inline\">launcher.Stop</code> перед удалением. Правки нужны в двух местах: <code class=\"inline\">handleDeleteGame</code> (или сам <code class=\"inline\">games.Repository.Delete</code>) должен сначала остановить все живые регионы игры, <code class=\"inline\">handleRemoveRegion</code> — то же самое для одного региона.</p><p>Отдельно, не по твоему вопросу, но нашёл попутно: MinIO-бакет <code class=\"inline\">builds</code> и registry в dev-кластере сейчас пустые (переживший рестарт под, ~2 часа назад) — путь через пресеты/загрузку билдов сейчас сломан в dev-стенде. Не чинил, это отдельная тема.</p><p>Чинить оба бага сейчас?</p>",
     "ts": "2026-07-06T10:31:31.170Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>да, чиним</p>",
+    "ts": "2026-07-06T10:31:49.586Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, <code class=\"inline\">s.launcher</code> уже доступен в handlers.go. Реализую фикс.</p>",
+    "ts": "2026-07-06T10:32:35.363Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю <code class=\"inline\">StopRegion</code> в launcher — та же идемпотентная логика, что у <code class=\"inline\">Stop</code>, но для одного региона.</p>",
+    "ts": "2026-07-06T10:32:40.072Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">handleDeleteGame</code> — вызываю <code class=\"inline\">launcher.Stop</code> перед удалением строки игры.</p>",
+    "ts": "2026-07-06T10:33:00.817Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую и гоняю существующие тесты пакетов.</p>",
+    "ts": "2026-07-06T10:33:11.462Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собирается. Гоняю тесты затронутых пакетов.</p>",
+    "ts": "2026-07-06T10:33:23.529Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю тесты на <code class=\"inline\">StopRegion</code> сразу после существующих <code class=\"inline\">Stop</code>-тестов.</p>",
+    "ts": "2026-07-06T10:34:03.179Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 4 новых теста прошли. Теперь тесты на уровне HTTP-хендлеров (<code class=\"inline\">handleDeleteGame</code>, <code class=\"inline\">handleRemoveRegion</code>), проверяющие сам факт вызова stop перед удалением.</p>",
+    "ts": "2026-07-06T10:34:35.798Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понятно, шаблон ясен. Пишу два новых теста — regression-тесты, воспроизводящие ровно найденный баг, только теперь ожидающие фикс.</p>",
+    "ts": "2026-07-06T10:35:03.528Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тест на удаление региона.</p>",
+    "ts": "2026-07-06T10:35:14.313Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все новые тесты зелёные. Теперь полный прогон затронутых пакетов и <code class=\"inline\">gofmt</code>/<code class=\"inline\">go vet</code>.</p>",
+    "ts": "2026-07-06T10:35:41.197Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто. Теперь подтверждаю фикс живьём на том же dev-стенде — воспроизведу оба прежних сценария и убедюсь, что Fleet теперь реально удаляется.</p>",
+    "ts": "2026-07-06T10:36:01.402Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">HTTP_ADDR=&quot;:18080&quot;</code>, не <code class=\"inline\">PORT</code>. Перезапускаю чисто — фильтрую только реально нужные переменные.</p>",
+    "ts": "2026-07-06T10:37:59.594Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь это чисто proper-quoted. Запускаю.</p>",
+    "ts": "2026-07-06T10:38:37.065Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю пути к kubeconfig в exports и перезапускаю.</p>",
+    "ts": "2026-07-06T10:39:03.124Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Coordinator снова живой (401 = требует авторизацию, как и должно быть), уже с фиксом. Повторяю оба сценария утечки.</p>",
+    "ts": "2026-07-06T10:39:18.731Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Баг №1 подтверждён починенным: <code class=\"inline\">Fleet</code> теперь реально удаляется вместе с игрой. Проверяю второй сценарий — удаление региона без stop.</p>",
+    "ts": "2026-07-06T10:40:41.076Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба бага подтверждены починенными живьём. Финальная проверка — фантомных Fleet&#x27;ов от моих тестов не осталось.</p>",
+    "ts": "2026-07-06T10:40:58.507Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю <code class=\"inline\">PROJECT_MAP.md</code> и <code class=\"inline\">WHATIF.md</code> — по конвенции проекта это часть definition of done.</p>",
+    "ts": "2026-07-06T10:41:20.041Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю строку про CRUD игр/регионов, добавив короткую отметку о фиксе.</p>",
+    "ts": "2026-07-06T10:42:06.578Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальная проверка — полная сборка и весь тестовый набор (не только affected-пакеты).</p>",
+    "ts": "2026-07-06T10:42:21.063Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — оба бага исправлены и подтверждены.</p><p>**Что сделано:**<br>1. <code class=\"inline\">internal/coordinator/launcher/launcher.go</code> — новый метод <code class=\"inline\">StopRegion</code> (тушит Fleet ровно одного региона, та же идемпотентная логика что у <code class=\"inline\">Stop</code>).<br>2. <code class=\"inline\">internal/coordinator/dashboardapi/handlers.go</code> — <code class=\"inline\">handleDeleteGame</code> теперь зовёт <code class=\"inline\">launcher.Stop</code> перед удалением строки игры; <code class=\"inline\">handleRemoveRegion</code> зовёт <code class=\"inline\">launcher.StopRegion</code> перед удалением строки региона.<br>3. Новые regression-тесты: 4 в <code class=\"inline\">launcher_test.go</code>, 2 в <code class=\"inline\">dashboardapi/handlers_test.go</code> — все проверяют, что Fleet реально исчезает (через фейковый Agones-клиент).<br>4. Живой повторный прогон на dev-кластере (пересобрал и перезапустил coordinator) — оба прежних сценария утечки теперь чисто убирают Fleet.<br>5. <code class=\"inline\">go build ./...</code>, <code class=\"inline\">go vet ./...</code>, полный <code class=\"inline\">go test ./...</code> — всё зелёное.<br>6. Обновил <code class=\"inline\">WHATIF.md</code> (новая строка «что если удалят запущенную игру/регион без stop») и <code class=\"inline\">PROJECT_MAP.md</code>.</p><p>**Важно про твоё окружение:** чтобы фикс подхватился, пришлось убить и перезапустить локальный бинарь coordinator&#x27;а из твоего <code class=\"inline\">make dev-stack</code> — он сейчас работает (PID 208154), но **уже не как дочерний процесс твоего dev-stack.sh**, а отдельным detached-процессом. Это значит: если нажмёшь Ctrl+C в терминале с <code class=\"inline\">make dev-stack</code>, этот coordinator **не остановится автоматически** — трап скрипта его не видит. Когда закончишь работать, либо <code class=\"inline\">kill 208154</code> вручную, либо просто перезапусти <code class=\"inline\">make dev-stack</code> заново (но сначала убей 208154, иначе получишь дублирование на общей БД — тот самый баг, что мы уже чинили раньше).</p><p>Также напомню: MinIO/registry в dev-кластере всё ещё пустые (нашёл это по пути, не чинил) — путь через пресеты/загрузку билдов сейчас не работает, отдельная тема.</p>",
+    "ts": "2026-07-06T10:42:55.967Z"
   }
 ]
