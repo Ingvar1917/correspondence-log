@@ -4865,5 +4865,23 @@
     "who": "claude",
     "html": "<p>Это не баг — у игры <code class=\"inline\">111</code> просто не задан <code class=\"inline\">game_port</code> (сейчас <code class=\"inline\">0</code>). Форма создания игры его не спрашивает (только вкладка Settings, как мы уже разбирали в похожем случае раньше). Открой Settings игры <code class=\"inline\">111</code> и укажи порт, на котором слушает твой сервер — после этого launch пройдёт. Хочешь, задам его сейчас через API, чтобы не лезть в UI?</p>",
     "ts": "2026-07-06T11:03:15.617Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>все равно launcher: game has no regions configured</p>",
+    "ts": "2026-07-06T11:05:42.284Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понял — ты уже пересоздал игру в UI (новый id) и сам выставил <code class=\"inline\">game_port=777</code>. Просто не хватает региона.</p>",
+    "ts": "2026-07-06T11:06:11.549Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — регион <code class=\"inline\">dev</code> добавлен, launch прошёл. Можешь проверять статус деплоя в UI (Overview → live-статус).</p>",
+    "ts": "2026-07-06T11:06:21.180Z"
   }
 ]
