@@ -4823,5 +4823,35 @@
     "who": "claude",
     "html": "<p>Готово. Причина ошибки: под MinIO в dev-кластере не подключён вообще никакой volume — данные живут в writable-слое контейнера и стираются при каждом рестарте пода (сам под перезапускался ~2 часа назад). Пересоздал бакет <code class=\"inline\">builds</code> тем же Job&#x27;ом, что и при первом <code class=\"inline\">make dev-up</code> — загрузка билдов снова работает (проверил живьём на твоей игре <code class=\"inline\">111</code>).</p><p>Если хочешь, чтобы это не повторялось при следующем рестарте MinIO-пода — нужен постоянный volume (PVC) вместо голого <code class=\"inline\">/data</code> в <code class=\"inline\">deploy/local/minio.yaml</code>. Заняться этим сейчас или это отдельная задача на потом?</p>",
     "ts": "2026-07-06T10:48:14.205Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>Job has reached the specified backoff limit<br>\u001b[36mINFO\u001b[0m[0000] Retrieving image manifest registry.coordinator.svc.cluster.local:5000/gamebase:dev <br>\u001b[36mINFO\u001b[0m[0000] Retrieving image registry.coordinator.svc.cluster.local:5000/gamebase:dev from registry registry.coordinator.svc.cluster.local:5000 <br>error building image: unable to complete operation after 0 attempts, last error: GET http://registry.coordinator.svc.cluster.local:5000/v2/gamebase/manifests/dev: MANIFEST_UNKNOWN: manifest unknown; map[Tag:dev]</p>",
+    "ts": "2026-07-06T10:50:17.742Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тот же корень проблемы — registry тоже пуст (проверял раньше: <code class=\"inline\">{&quot;repositories&quot;:[]}</code>). Пересобираю и пушу <code class=\"inline\">gamebase:dev</code> так же, как это делает <code class=\"inline\">setup-dev-extras.sh</code>.</p>",
+    "ts": "2026-07-06T10:50:31.435Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Локальный образ уже собран — просто перезаливаю в registry.</p>",
+    "ts": "2026-07-06T10:50:37.878Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба kind-loaded образа (<code class=\"inline\">bridge-sidecar:dev</code>, <code class=\"inline\">build-unpacker:dev</code>) на месте — их регистри не касается. Теперь retry сборки: перезапускаю упавший Job.</p>",
+    "ts": "2026-07-06T10:51:03.818Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Твой билд <code class=\"inline\">444</code> уже помечен <code class=\"inline\">failed</code> (backoff исчерпан до того, как я починил registry) — билд-контроллер сам его не перезапустит, нужна новая загрузка билда через UI (кнопку загрузки на вкладке Builds). Теперь база (gamebase:dev) снова в registry, так что повтор должен пройти.</p>",
+    "ts": "2026-07-06T10:51:30.696Z"
   }
 ]
