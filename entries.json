@@ -4781,5 +4781,47 @@
     "who": "claude",
     "html": "<p>Готово — оба бага исправлены и подтверждены.</p><p>**Что сделано:**<br>1. <code class=\"inline\">internal/coordinator/launcher/launcher.go</code> — новый метод <code class=\"inline\">StopRegion</code> (тушит Fleet ровно одного региона, та же идемпотентная логика что у <code class=\"inline\">Stop</code>).<br>2. <code class=\"inline\">internal/coordinator/dashboardapi/handlers.go</code> — <code class=\"inline\">handleDeleteGame</code> теперь зовёт <code class=\"inline\">launcher.Stop</code> перед удалением строки игры; <code class=\"inline\">handleRemoveRegion</code> зовёт <code class=\"inline\">launcher.StopRegion</code> перед удалением строки региона.<br>3. Новые regression-тесты: 4 в <code class=\"inline\">launcher_test.go</code>, 2 в <code class=\"inline\">dashboardapi/handlers_test.go</code> — все проверяют, что Fleet реально исчезает (через фейковый Agones-клиент).<br>4. Живой повторный прогон на dev-кластере (пересобрал и перезапустил coordinator) — оба прежних сценария утечки теперь чисто убирают Fleet.<br>5. <code class=\"inline\">go build ./...</code>, <code class=\"inline\">go vet ./...</code>, полный <code class=\"inline\">go test ./...</code> — всё зелёное.<br>6. Обновил <code class=\"inline\">WHATIF.md</code> (новая строка «что если удалят запущенную игру/регион без stop») и <code class=\"inline\">PROJECT_MAP.md</code>.</p><p>**Важно про твоё окружение:** чтобы фикс подхватился, пришлось убить и перезапустить локальный бинарь coordinator&#x27;а из твоего <code class=\"inline\">make dev-stack</code> — он сейчас работает (PID 208154), но **уже не как дочерний процесс твоего dev-stack.sh**, а отдельным detached-процессом. Это значит: если нажмёшь Ctrl+C в терминале с <code class=\"inline\">make dev-stack</code>, этот coordinator **не остановится автоматически** — трап скрипта его не видит. Когда закончишь работать, либо <code class=\"inline\">kill 208154</code> вручную, либо просто перезапусти <code class=\"inline\">make dev-stack</code> заново (но сначала убей 208154, иначе получишь дублирование на общей БД — тот самый баг, что мы уже чинили раньше).</p><p>Также напомню: MinIO/registry в dev-кластере всё ещё пустые (нашёл это по пути, не чинил) — путь через пресеты/загрузку билдов сейчас не работает, отдельная тема.</p>",
     "ts": "2026-07-06T10:42:55.967Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>2026/07/06 12:44:25 [dashboardapi] internal error: init multipart upload: create multipart upload: operation error S3: CreateMultipartUpload, https response error StatusCode: 404, RequestID: 18BFAD6DFD8E120A, HostID: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, api error NoSuchBucket: The specified bucket does not exist</p><p>ошибка при загрузке билда</p>",
+    "ts": "2026-07-06T10:44:54.855Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это та самая проблема, что я нашёл по пути (бакет <code class=\"inline\">builds</code> в MinIO пропал после рестарта пода). Чиню — пересоздаю бакет.</p>",
+    "ts": "2026-07-06T10:45:04.616Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Причина: Deployment MinIO вообще не использует volume — <code class=\"inline\">/data</code> живёт в writable-слое контейнера и стирается при любом рестарте пода (сейчас без PVC). Пересоздам бакет тем же Job&#x27;ом, что и раньше.</p>",
+    "ts": "2026-07-06T10:45:27.007Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю, что бакет реально появился.</p>",
+    "ts": "2026-07-06T10:46:00.759Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверил — это реально та же БД (in-cluster Postgres, host и k8s видят одинаковые данные), просто игра <code class=\"inline\">111</code> — видимо твоя собственная, только что созданная через сам UI, пока я чинил baги. Пробую загрузку билда именно для неё.</p>",
+    "ts": "2026-07-06T10:47:47.265Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Работает — presigned URL для загрузки вернулся без ошибки. Удаляю тестовый билд, чтобы не мусорить.</p>",
+    "ts": "2026-07-06T10:48:03.475Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Причина ошибки: под MinIO в dev-кластере не подключён вообще никакой volume — данные живут в writable-слое контейнера и стираются при каждом рестарте пода (сам под перезапускался ~2 часа назад). Пересоздал бакет <code class=\"inline\">builds</code> тем же Job&#x27;ом, что и при первом <code class=\"inline\">make dev-up</code> — загрузка билдов снова работает (проверил живьём на твоей игре <code class=\"inline\">111</code>).</p><p>Если хочешь, чтобы это не повторялось при следующем рестарте MinIO-пода — нужен постоянный volume (PVC) вместо голого <code class=\"inline\">/data</code> в <code class=\"inline\">deploy/local/minio.yaml</code>. Заняться этим сейчас или это отдельная задача на потом?</p>",
+    "ts": "2026-07-06T10:48:14.205Z"
   }
 ]
