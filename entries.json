@@ -4961,5 +4961,17 @@
     "who": "claude",
     "html": "<p>Готово, весь тестовый набор фронта зелёный. <code class=\"inline\">confirm</code> убран из кнопки Stop — теперь клик сразу шлёт запрос. Vite dev-сервер должен подхватить правку сам (HMR); если в браузере не обновилось — просто перезагрузи страницу и попробуй ещё раз.</p>",
     "ts": "2026-07-06T11:16:14.488Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>XHRGET<br>http://localhost:15173/dashboard/games/c2da42f2-d110-4d80-acc7-f4d1d1f29d56/regions/dev/status<br>[HTTP/1.1 404 Not Found 5ms]</p><p>GET<br>\thttp://localhost:15173/dashboard/games/c2da42f2-d110-4d80-acc7-f4d1d1f29d56/regions/dev/status<br>Status<br>404<br>Not Found<br>VersionHTTP/1.1<br>Transferred224 B (76 B size)<br>Referrer Policystrict-origin-when-cross-origin<br>DNS ResolutionSystem</p><p>connection<br>    \tclose<br>    content-length<br>    \t76<br>    content-type<br>    \tapplication/json<br>    date<br>    \tMon, 06 Jul 2026 11:16:42 GMT<br>    Vary<br>    \tOrigin</p><p>Accept<br>    \t*/*<br>    Accept-Encoding<br>    \tgzip, deflate, br, zstd<br>    Accept-Language<br>    \ten-US,en;q=0.9<br>    Connection<br>    \tkeep-alive<br>    Cookie<br>    \tdashboard_session=484c8118cbd0d04ad2cf4f30953faf247a06feb78ef215e9dff600008dbbb909<br>    Host<br>    \tlocalhost:15173<br>    Priority<br>    \tu=4<br>    Referer<br>    \thttp://localhost:15173/app/games/c2da42f2-d110-4d80-acc7-f4d1d1f29d56<br>    Sec-Fetch-Dest<br>    \tempty<br>    Sec-Fetch-Mode<br>    \tcors<br>    Sec-Fetch-Site<br>    \tsame-origin<br>    Sec-GPC<br>    \t1<br>    User-Agent<br>    \tMozilla/5.0 (X11; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0</p><p>на странице http://localhost:15173/app/games/c2da42f2-d110-4d80-acc7-f4d1d1f29d56</p>",
+    "ts": "2026-07-06T11:17:20.446Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это ожидаемо, а не баг: <code class=\"inline\">stop</code> сработал (Fleet в k8s реально удалён, region.cluster_id очищен), а <code class=\"inline\">GET .../regions/dev/status</code> **специально** отвечает 404 для незапущенного региона (<code class=\"inline\">launcher.ErrRegionNotLaunched</code> → <code class=\"inline\">not_found</code>) — это подтверждение того, что твой stop наконец-то прошёл. UI, скорее всего, просто показывает &quot;not launched&quot; вместо графика, как и было в тесте на этот сценарий. Можешь подтвердить, что на странице статус региона теперь &quot;not launched&quot;, а не крутится ошибка?</p>",
+    "ts": "2026-07-06T11:17:36.276Z"
   }
 ]
