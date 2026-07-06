@@ -88,6 +88,10 @@
     text-transform: uppercase; white-space: nowrap;
   }
   .divider .line { flex: 1; height: 1px; background: var(--rule); }
+  .divider .divider-date {
+    font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--ink-faint);
+    white-space: nowrap;
+  }
   .entry { padding: 18px 0; border-bottom: 1px solid var(--rule); animation: fadein 0.4s ease; }
   @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   @media (prefers-reduced-motion: reduce) { .entry { animation: none; } }
@@ -157,6 +161,15 @@
       el.className = 'divider';
       el.innerHTML = '<span class="label"></span><span class="line"></span>';
       el.querySelector('.label').textContent = e.label;
+      if (e.date) {
+        var dateEl = document.createElement('span');
+        dateEl.className = 'divider-date';
+        var d = new Date(e.date + 'T00:00:00Z');
+        if (!isNaN(d)) {
+          dateEl.textContent = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+          el.appendChild(dateEl);
+        }
+      }
     } else {
       el.className = 'entry';
       var tagClass = e.who === 'ihar' ? 'tag--ihar' : 'tag--claude';
