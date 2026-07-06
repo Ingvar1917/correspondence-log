@@ -106,7 +106,7 @@ def main():
         if not text:
             continue
         who = "ihar" if rec_type == "user" else "claude"
-        new_entries.append({"type": "msg", "who": who, "html": text_to_html(text)})
+        new_entries.append({"type": "msg", "who": who, "html": text_to_html(text), "ts": rec.get("timestamp")})
 
     state[transcript_path] = len(lines)
     with open(STATE_PATH, "w") as f:
