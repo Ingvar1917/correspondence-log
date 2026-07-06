@@ -4853,5 +4853,17 @@
     "who": "claude",
     "html": "<p>Твой билд <code class=\"inline\">444</code> уже помечен <code class=\"inline\">failed</code> (backoff исчерпан до того, как я починил registry) — билд-контроллер сам его не перезапустит, нужна новая загрузка билда через UI (кнопку загрузки на вкладке Builds). Теперь база (gamebase:dev) снова в registry, так что повтор должен пройти.</p>",
     "ts": "2026-07-06T10:51:30.696Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>launcher: game_port is not configured</p>",
+    "ts": "2026-07-06T11:02:58.509Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это не баг — у игры <code class=\"inline\">111</code> просто не задан <code class=\"inline\">game_port</code> (сейчас <code class=\"inline\">0</code>). Форма создания игры его не спрашивает (только вкладка Settings, как мы уже разбирали в похожем случае раньше). Открой Settings игры <code class=\"inline\">111</code> и укажи порт, на котором слушает твой сервер — после этого launch пройдёт. Хочешь, задам его сейчас через API, чтобы не лезть в UI?</p>",
+    "ts": "2026-07-06T11:03:15.617Z"
   }
 ]
