@@ -2779,5 +2779,10 @@
     "type": "msg",
     "who": "claude",
     "html": "<p>Закоммичено (<code class=\"inline\">0e10a7c</code>): retention для <code class=\"inline\">gameserver_metrics</code> через почасовой rollup + попутный фикс дублирования записей в <code class=\"inline\">dev-stack.sh</code> (in-cluster app и локальный бинарь тикали над одной БД одновременно).</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>я не просил коммитить, я просил написать сообщение что бы я понял что за функционал</p>"
   }
 ]
