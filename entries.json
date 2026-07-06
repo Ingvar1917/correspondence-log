@@ -2914,5 +2914,45 @@
     "type": "msg",
     "who": "claude",
     "html": "<p>Не выходит — команда требует интерактивного терминала (нужно ввести one-time code в браузере), а мой Bash-инструмент это не может. Открой свой терминал и выполни там сам:</p><pre><code>\ngh auth refresh -s workflow -h github.com\n</code></pre><p>Она покажет one-time code и откроет браузер для подтверждения. Как подтвердишь — скажи, я продолжу настройку Actions-деплоя.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделал</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Скоуп <code class=\"inline\">workflow</code> появился. Настраиваю Actions-based деплой Pages: workflow-файл + переключение источника Pages с legacy-ветки на Actions.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ставлю простой workflow: деплой статики из корня без сборки (сайт — плейн HTML/JS/JSON, никакого билд-шага не нужно).</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь переключаю источник Pages с legacy-ветки на Actions.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Есть in_progress прогон нашего Actions-воркфлоу. Подожду завершения и проверю сайт.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Успешно. Проверяю, что сайт реально отдаётся и совпадает с последними данными.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Pages теперь на <code class=\"inline\">build_type: workflow</code> (Actions), сайт живой, 585 записей актуальны. Обновлю память с новым состоянием.</p>"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>- Pages переведён на Actions-деплой (<code class=\"inline\">actions/upload-pages-artifact</code> + <code class=\"inline\">deploy-pages</code>), без Jekyll — тот самый источник флаки-ошибок убран.<br>- Workflow задеплоился и прошёл успешно (<code class=\"inline\">gh run list</code> → <code class=\"inline\">completed success</code>), сайт отдаёт 200, 585 записей на месте.<br>- Лаг теперь должен быть только на время самого GitHub Actions прогона (обычно быстрее и стабильнее прежнего Jekyll-билдера, без случайных фейлов).<br>- Обновил память с новой схемой диагностики (проверять <code class=\"inline\">gh run list --workflow=pages.yml</code>, а не старый Pages-builds API).</p>"
   }
 ]
