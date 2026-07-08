@@ -7937,5 +7937,53 @@
     "who": "claude",
     "html": "<p>Разложил по шагам, что реально произойдёт — и по пути проверил пару мест, которые иначе всплыли бы неприятным сюрпризом.</p><p>## Что уже работает &quot;из коробки&quot;</p><p>1. **Дроплет + Docker** — ставишь Docker, всё остальное — уже готовый образ <code class=\"inline\">ghcr.io/ingvar1917/coordinator:latest</code> (собирается CI на каждый пуш в main).<br>2. **Postgres** — managed DO Database или контейнер на той же машине для начала.<br>3. **Env-переменные**: <code class=\"inline\">DATABASE_URL</code>, <code class=\"inline\">CLUSTER_KUBECONFIG_KEY</code> (<code class=\"inline\">openssl rand -base64 32</code>), <code class=\"inline\">BRIDGE_SIDECAR_IMAGE=ghcr.io/ingvar1917/bridge-sidecar:latest</code>, <code class=\"inline\">DO_API_TOKEN</code> (создать в панели DO). <code class=\"inline\">AGONES_KUBECONFIG</code> НЕ ставишь вообще — это тот самый фикс, из-за которого можно начать без готового игрового кластера.<br>4. <code class=\"inline\">docker run</code> с этими переменными — coordinator сам накатит миграции, поднимется на <code class=\"inline\">:8080</code>, залогирует «no bootstrap cluster — provision via Admin Dashboard».<br>5. Логинишься в Admin Dashboard, жмёшь «Create cluster» (DO/регион) — это уже реально работающий код (<code class=\"inline\">DOAdapter.CreateCluster</code>, только без живой проверки на настоящем DO-аккаунте, что как раз твой случай и закроет): создаётся настоящий DOKS-кластер, ставится Agones через helm, регистрируется в БД.<br>6. Дальше — обычный флоу: индюк регистрируется, создаёт игру (можно сразу через **готовый Docker-образ** — <code class=\"inline\">image_url</code>, advanced-путь, не требует пайплайна билдов вообще), назначает регион, жмёт Launch → реальный Fleet на настоящем DO-кластере → Public Game API отдаёт реальный <code class=\"inline\">ip:port</code>.</p><p>## Что реально споткнётся сразу — проверил только что</p><p>- **<code class=\"inline\">ghcr.io/ingvar1917/coordinator</code> сейчас приватный** — попробовал <code class=\"inline\">docker pull</code> без логина, получил <code class=\"inline\">401 unauthorized</code>. На дроплете либо делаешь пакет публичным (GitHub → Packages → package settings), либо <code class=\"inline\">docker login ghcr.io</code> с PAT (<code class=\"inline\">read:packages</code>).<br>- **Первый админ** — <code class=\"inline\">cmd/create-admin</code> не HTTP-эндпоинт (сознательно), а отдельный бинарь. Он не входит ни в один из трёх образов, которые собирает CI (<code class=\"inline\">coordinator</code>/<code class=\"inline\">bridge-sidecar</code>/<code class=\"inline\">build-unpacker</code>) — придётся либо собрать его локально/на дроплете (<code class=\"inline\">go build ./cmd/create-admin</code>) с сетевым доступом до той же Postgres, либо добавить его сборку в Docker-образ отдельным шагом.<br>- **TLS** — куки <code class=\"inline\">Secure</code> выставляются автоматически по факту TLS/<code class=\"inline\">X-Forwarded-Proto</code> (<code class=\"inline\">cookie.go</code>), так что на голом HTTP всё формально заработает, но для настоящего прода нужен reverse-proxy/DO Load Balancer с сертификатом — иначе куки без <code class=\"inline\">Secure</code> над открытым интернетом.<br>- **Пайплайн билдов (аплоад архива → сборка)** — не заработает без отдельного <code class=\"inline\">BUILDS_KUBECONFIG</code> (кластер под kaniko-Job&#x27;ы, тот самый «системный кластер» из карты) + <code class=\"inline\">BUILDS_S3_*</code> (DO Spaces). Без них — только advanced-путь через готовый Docker-образ, что для первой проверки более чем достаточно.</p><p>Если хочешь, могу прямо сейчас написать <code class=\"inline\">docker-compose.yml</code>/systemd-unit и короткий чек-лист команд под этот конкретный сценарий (голый дроплет), чтобы не собирать его в голове по ходу.</p>",
     "ts": "2026-07-08T13:38:26.582Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>напиши</p>",
+    "ts": "2026-07-08T13:39:14.518Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь пишу файлы под минимальный сценарий (голый дроплет, без build-пайплайна) в <code class=\"inline\">deploy/prod/</code>.</p>",
+    "ts": "2026-07-08T13:40:06.028Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю синтаксис compose-файла.</p>",
+    "ts": "2026-07-08T13:41:24.522Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Синтаксис валиден, переменные подставляются корректно. Финальная проверка — реально поднимаю стек локально (без реального DO-токена, просто чтобы убедиться, что coordinator стартует чисто в связке с Postgres+Caddy).</p>",
+    "ts": "2026-07-08T13:41:35.327Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо (тот самый приватный образ). Собираю локально для проверки самого compose-стека.</p>",
+    "ts": "2026-07-08T13:41:54.416Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Postgres healthcheck сработал, coordinator дождался, применил миграции и поднялся с ожидаемым логом. Caddy не стартовал только из-за занятого 80-го порта на этой машине (не проблема самого compose) — проверяю сам coordinator напрямую.</p>",
+    "ts": "2026-07-08T13:42:51.931Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Indie Dashboard раздаётся корректно. Прибираю за собой.</p>",
+    "ts": "2026-07-08T13:42:58.676Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Написал и живьём проверил (реальный <code class=\"inline\">docker compose up</code> с Postgres healthcheck + coordinator + локально собранным образом — postgres стал healthy, coordinator дождался, применил миграции, поднялся, <code class=\"inline\">/app/</code> отдал реальный HTML):</p><p>- **<code class=\"inline\">deploy/prod/docker-compose.yml</code>** — postgres + coordinator + caddy, без публикации портов Postgres/coordinator наружу (только caddy на 80/443)<br>- **<code class=\"inline\">deploy/prod/Caddyfile</code>** — авто-HTTPS на домен из <code class=\"inline\">.env</code><br>- **<code class=\"inline\">deploy/prod/.env.example</code>** — шаблон секретов с комментариями, что откуда брать<br>- **<code class=\"inline\">deploy/prod/README.md</code>** — пронумерованный чек-лист: дроплет → DNS → открыть приватный ghcr-образ → <code class=\"inline\">.env</code> → <code class=\"inline\">docker compose up</code> → <code class=\"inline\">create-admin</code> (одноразовый контейнер в той же сети, без открытия БД в интернет) → первый логин и провижининг кластера → проверка сквозного флоу → обновление</p><p>Всё это новые файлы, ничего существующего не тронуто (<code class=\"inline\">git status</code> показывает только <code class=\"inline\">deploy/prod/</code> как untracked).</p>",
+    "ts": "2026-07-08T13:43:21.406Z"
   }
 ]
