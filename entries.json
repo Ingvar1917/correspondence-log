@@ -8135,5 +8135,269 @@
     "who": "claude",
     "html": "<p>Готово. <code class=\"inline\">make prod-local-up</code> / <code class=\"inline\">make prod-local-down</code> — живьём проверено от нуля до чистого удаления:</p><p>- **<code class=\"inline\">deploy/prod/docker-compose.local.yml</code>** — самодостаточный (не override) стек: Postgres + coordinator (собирается из исходников, не тянет <code class=\"inline\">ghcr.io</code>) + Caddy на портах <code class=\"inline\">8880</code>/<code class=\"inline\">8443</code> (чтобы не конфликтовать с занятым 80-м на машине разработчика)<br>- **<code class=\"inline\">deploy/prod/Caddyfile.local</code>** — та же рерайт-логика, что в прод-<code class=\"inline\">Caddyfile</code>, но голый HTTP (Let&#x27;s Encrypt не выпустит сертификат тестовым доменам)<br>- **<code class=\"inline\">deploy/prod/test-local-up.sh</code>** — генерирует <code class=\"inline\">deploy/prod/.env.local</code> (тестовые домены <code class=\"inline\">*.local.test</code>, случайный ключ шифрования) при первом запуске, поднимает стек, печатает готовые команды <code class=\"inline\">curl --resolve</code> и подсказку про <code class=\"inline\">/etc/hosts</code><br>- **<code class=\"inline\">deploy/prod/test-local-down.sh</code>** — гасит и сносит<br>- <code class=\"inline\">Makefile</code> — таргеты <code class=\"inline\">prod-local-up</code>/<code class=\"inline\">prod-local-down</code><br>- <code class=\"inline\">.gitignore</code> — добавлен <code class=\"inline\">deploy/prod/.env.local</code></p>",
     "ts": "2026-07-08T14:02:47.056Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>&lt;Router basename=&quot;/app&quot;&gt; is not able to match the URL &quot;/&quot; because it does not start with the basename, so the &lt;Router&gt; won&#x27;t render anything. index-B90AgB_k.js:58:748</p>",
+    "ts": "2026-07-08T14:06:13.796Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл причину — это реальный баг в моей же схеме с Caddy-рерайтом, не мелочь. Проверяю точно.</p>",
+    "ts": "2026-07-08T14:07:11.646Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Воспроизвёл и подтвердил один в один — это реальная дыра в моей же схеме рерайта, не мелочь.</p><p>**Причина**: <code class=\"inline\">rewrite</code> в Caddy — это **невидимый внутренний форвард**, не редирект. HTTP-статус на <code class=\"inline\">GET /</code> — <code class=\"inline\">200</code>, не <code class=\"inline\">3xx</code>. Значит браузер как был на <code class=\"inline\">http://app.local.test/</code>, так и остаётся там в адресной строке — а получает при этом HTML с бандлом (<code class=\"inline\">index-B90AgB_k.js</code>, тот самый файл из твоей ошибки), у которого <code class=\"inline\">basename=&quot;/app&quot;</code> зашит намертво при сборке (<code class=\"inline\">dashboardui/src/main.tsx</code>, <code class=\"inline\">&lt;BrowserRouter basename=&quot;/app&quot;&gt;</code>). React Router сверяет <code class=\"inline\">basename</code> с реальным <code class=\"inline\">window.location.pathname</code> — а тот равен <code class=\"inline\">/</code>, не <code class=\"inline\">/app/...</code> — несовпадение, роутер честно отказывается рендерить.</p><p>Раздача самого <code class=\"inline\">index.html</code>/статики через рерайт работает (я это и проверил тогда), а вот **клиентский роутинг ломается**, потому что зависит от того, что браузер реально думает о своём URL, а не от того, что Caddy подставил бэкенду за кулисами.</p><p>Тут развилка, и оба варианта не косметика:</p>",
+    "ts": "2026-07-08T14:08:26.512Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готов представить план.</p>",
+    "ts": "2026-07-08T14:13:32.272Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Начинаю с <code class=\"inline\">main.go</code>.</p>",
+    "ts": "2026-07-08T14:13:58.895Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю сам блок регистрации <code class=\"inline\">rootMux</code> и добавляю <code class=\"inline\">stripHostPort</code>.</p>",
+    "ts": "2026-07-08T14:14:46.203Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую.</p>",
+    "ts": "2026-07-08T14:15:40.237Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю doc-комментарий пакета, упоминая host-routing.</p>",
+    "ts": "2026-07-08T14:15:49.797Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Отмечаю первый пункт выполненным, перехожу к фронтам.</p>",
+    "ts": "2026-07-08T14:16:03.109Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь то же для <code class=\"inline\">admindashboardui/vite.config.ts</code>.</p>",
+    "ts": "2026-07-08T14:16:31.883Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">main.tsx</code> в обоих проектах.</p>",
+    "ts": "2026-07-08T14:16:46.525Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю недостающий <code class=\"inline\">vite-env.d.ts</code> (даёт типы <code class=\"inline\">import.meta.env</code>) в оба проекта — без него <code class=\"inline\">import.meta.env.VITE_BASENAME</code> не типизируется.</p>",
+    "ts": "2026-07-08T14:17:21.035Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">main.tsx</code> в обоих UI.</p>",
+    "ts": "2026-07-08T14:17:34.232Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо. Теперь то же самое для admindashboardui.</p>",
+    "ts": "2026-07-08T14:18:04.964Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю сборку и типы для обоих UI.</p>",
+    "ts": "2026-07-08T14:18:12.952Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба чисто типизируются. Проверяю тесты обоих UI (дефолтная сборка не должна измениться).</p>",
+    "ts": "2026-07-08T14:18:24.421Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба зелёные. Теперь Dockerfile.</p>",
+    "ts": "2026-07-08T14:18:49.066Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собираю дефолтный вариант (должен совпадать с текущим поведением) и проверяю.</p>",
+    "ts": "2026-07-08T14:19:27.397Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл: global ARG объявлен ПОСЛЕ первого <code class=\"inline\">FROM</code> (не в истинно глобальной области), поэтому bare <code class=\"inline\">ARG NAME</code> внутри стадии не подхватил дефолт. Фикс — дублирую дефолт прямо в каждой стадии (надёжнее, не зависит от тонкостей наследования).</p>",
+    "ts": "2026-07-08T14:21:10.822Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Comment reads fine now. Пересобираю и проверяю.</p>",
+    "ts": "2026-07-08T14:21:32.041Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Дефолт восстановлен (тот же хэш бандла, что и до всех правок — байт-в-байт). Собираю host-routed вариант и сравниваю.</p>",
+    "ts": "2026-07-08T14:21:49.019Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прямое доказательство фикса — грепаю сам JS-бандл на предмет <code class=\"inline\">basename</code>.</p>",
+    "ts": "2026-07-08T14:22:08.474Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Подтверждено напрямую в бандле: дефолтная сборка несёт литерал <code class=\"inline\">/app</code> (1 вхождение — тот самый basename), host-routed сборка — ноль вхождений. Корень бага устранён на уровне артефакта. Прибираю тестовые образы.</p>",
+    "ts": "2026-07-08T14:22:29.263Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь упрощаю <code class=\"inline\">Caddyfile</code>/<code class=\"inline\">Caddyfile.local</code> — рерайт-трюк больше не нужен.</p>",
+    "ts": "2026-07-08T14:22:39.503Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю синтаксис Caddyfile&#x27;ов.</p>",
+    "ts": "2026-07-08T14:23:07.458Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба валидны. Теперь обновляю docker-compose файлы и test-local-up.sh под host-routing.</p>",
+    "ts": "2026-07-08T14:23:15.036Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">.env.example</code> — добавляю <code class=\"inline\">COORDINATOR_IMAGE</code>/<code class=\"inline\">API_HOST</code>/<code class=\"inline\">APP_HOST</code>/<code class=\"inline\">ADMIN_HOST</code>.</p>",
+    "ts": "2026-07-08T14:24:22.520Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">docker-compose.local.yml</code> — всегда host-routed сборка.</p>",
+    "ts": "2026-07-08T14:24:40.473Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю <code class=\"inline\">test-local-up.sh</code> — не нужно ли что-то поправить в сообщениях.</p>",
+    "ts": "2026-07-08T14:25:11.978Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Комментарий на строке 5 упоминает старый «рерайт пути» — обновляю его.</p>",
+    "ts": "2026-07-08T14:25:17.610Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь пишу Go-тесты.</p>",
+    "ts": "2026-07-08T14:25:32.458Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — сейчас добавлю сами тесты, использующие эти импорты.</p>",
+    "ts": "2026-07-08T14:26:04.191Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Запускаю все тесты <code class=\"inline\">cmd/coordinator</code>.</p>",
+    "ts": "2026-07-08T14:26:25.810Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все тесты зелёные, включая новые. Теперь обновляю WHATIF.md и README.md.</p>",
+    "ts": "2026-07-08T14:26:44.449Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю новую строку после последней (33).</p>",
+    "ts": "2026-07-08T14:26:59.811Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю <code class=\"inline\">deploy/prod/README.md</code> — заменяю раздел про «косметическую» изоляцию на настоящую host-based.</p>",
+    "ts": "2026-07-08T14:27:29.370Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>This is still accurate (both messages remain unconditional). Good enough — no change needed there. Now let&#x27;s run the full live verification pass.</p>",
+    "ts": "2026-07-08T14:28:30.166Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">make prod-local-up</code> — полная живая проверка новой host-routed схемы.</p>",
+    "ts": "2026-07-08T14:28:48.589Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю логи coordinator&#x27;а (должен показать host-routed маршруты) и сами домены.</p>",
+    "ts": "2026-07-08T14:29:31.422Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Логи подтверждают host-based маршруты (<code class=\"inline\">app.local.test/</code>, <code class=\"inline\">admin.local.test/</code>, а не <code class=\"inline\">/app/</code>/<code class=\"inline\">/adminapp/</code>). Проверяю сами домены и содержимое бандла.</p>",
+    "ts": "2026-07-08T14:29:37.643Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полное подтверждение — включая настоящую изоляцию (<code class=\"inline\">api.local.test/adminapp/</code> и <code class=\"inline\">/app/</code> теперь честно <code class=\"inline\">404</code>, а не утекают на тот же бэкенд, как было с Caddy-рерайтом). Прибираю за собой.</p>",
+    "ts": "2026-07-08T14:29:54.864Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальный прогон <code class=\"inline\">test-ui</code> и полного Go-набора для уверенности.</p>",
+    "ts": "2026-07-08T14:30:06.075Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное.</p>",
+    "ts": "2026-07-08T14:30:22.357Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>**Причина бага** — Caddy <code class=\"inline\">rewrite</code> был невидимым форвардом (HTTP 200, не редирект): браузер оставался на <code class=\"inline\">.../</code>, а собранный бандл нёс <code class=\"inline\">basename=&quot;/app&quot;</code> — React Router сверял с реальным <code class=\"inline\">window.location</code> и отказывался рендерить. Заодно это не давало настоящей изоляции доменов (утечка на общий бэкенд).</p><p>**Фикс** — настоящий Host-based роутинг:<br>- <code class=\"inline\">cmd/coordinator/main.go</code> — опциональные <code class=\"inline\">API_HOST</code>/<code class=\"inline\">APP_HOST</code>/<code class=\"inline\">ADMIN_HOST</code> (всё или ничего), host-qualified паттерны <code class=\"inline\">http.ServeMux</code> (Go 1.22+), <code class=\"inline\">stripHostPort</code>-миддлвар (порт в <code class=\"inline\">Host</code> иначе не даёт матчиться). Пустые переменные — поведение байт-в-байт как раньше.<br>- <code class=\"inline\">dashboardui</code>/<code class=\"inline\">admindashboardui</code>: <code class=\"inline\">base</code>/<code class=\"inline\">basename</code> теперь сборочно-конфигурируемые (<code class=\"inline\">VITE_BASE</code>/<code class=\"inline\">VITE_BASENAME</code>), дефолт = сегодняшнее поведение.<br>- <code class=\"inline\">Dockerfile</code>: ARG&#x27;и на каждую UI-стадию (нашёл и попутно починил реальный баг с областью видимости — глобальный <code class=\"inline\">ARG</code> был объявлен после первого <code class=\"inline\">FROM</code>, поэтому дефолт не наследовался).<br>- <code class=\"inline\">Caddyfile</code>/<code class=\"inline\">Caddyfile.local</code> — упростились до голых <code class=\"inline\">reverse_proxy</code>, рерайт не нужен.<br>- <code class=\"inline\">docker-compose.yml</code>/<code class=\"inline\">.local.yml</code>, <code class=\"inline\">.env.example</code>, <code class=\"inline\">README.md</code> — под новую схему.</p><p>**Живое доказательство**: <code class=\"inline\">grep</code> бандла — дефолтная сборка несёт <code class=\"inline\">/app</code> (1 вхождение), host-routed — 0. <code class=\"inline\">make prod-local-up</code> (теперь всегда host-routed) — оба домена отдают корректный root-mounted контент (<code class=\"inline\">src=&quot;/assets/...&quot;</code>, не <code class=\"inline\">/app/assets/...</code>), API-пути живы, а **<code class=\"inline\">api.local.test/adminapp/</code> и <code class=\"inline\">/app/</code> честно дают <code class=\"inline\">404</code>** — настоящая, не косметическая изоляция. <code class=\"inline\">go test</code>/<code class=\"inline\">test-ui</code> — всё зелёное, поведение по умолчанию не изменилось.</p>",
+    "ts": "2026-07-08T14:30:41.404Z"
   }
 ]
