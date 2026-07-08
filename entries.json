@@ -8501,5 +8501,77 @@
     "who": "claude",
     "html": "<p>**По конфигу** (Vite-дефолты):<br>- <code class=\"inline\">dashboardui</code> — порт не задан в <code class=\"inline\">vite.config.ts</code>, значит дефолт Vite — **5173**<br>- <code class=\"inline\">admindashboardui</code> — явно задан **5174**</p><p>**Но сейчас у тебя реально запущено** (видно в процессах) через <code class=\"inline\">make dev-stack</code>, который передаёт <code class=\"inline\">--port</code> явно:<br>- <code class=\"inline\">dashboardui</code> — **15173** (<code class=\"inline\">http://localhost:15173/app/</code>)<br>- <code class=\"inline\">admindashboardui</code> — **15174** (<code class=\"inline\">http://localhost:15174/adminapp/</code>)</p><p>Если запускать не через <code class=\"inline\">make dev-stack</code>, а напрямую <code class=\"inline\">make dev-indie-ui</code>/<code class=\"inline\">make dev-admin-ui</code> (одиночный Vite без <code class=\"inline\">dev-stack</code>) — будут дефолтные **5173**/**5174**.</p>",
     "ts": "2026-07-08T16:41:37.233Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделай 2 команды для создания admin пользователя в режиме dev и режиме prod-local</p>",
+    "ts": "2026-07-08T16:44:09.320Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю <code class=\"inline\">make</code>-таргеты.</p>",
+    "ts": "2026-07-08T16:45:25.545Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь второй таргет — рядом с <code class=\"inline\">prod-local-up</code>/<code class=\"inline\">prod-local-down</code>.</p>",
+    "ts": "2026-07-08T16:45:39.879Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю обе команды живьём. Сначала dev (нужен <code class=\"inline\">make dev-up</code> — проверяю, поднят ли dev-стенд).</p>",
+    "ts": "2026-07-08T16:45:59.393Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Dev-кластер поднят. Проверяю без ошибки на пустой аргумент, затем с реальным email/паролем.</p>",
+    "ts": "2026-07-08T16:46:04.763Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ошибка использования отрабатывает корректно. Теперь с реальными данными.</p>",
+    "ts": "2026-07-08T16:46:12.032Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Работает. Проверяю логин через реальный сервис.</p>",
+    "ts": "2026-07-08T16:46:16.744Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Работает сквозь весь цикл. Теперь prod-local — проверяю, поднят ли стенд.</p>",
+    "ts": "2026-07-08T16:46:24.425Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Стенд сейчас погашен — поднимаю и проверяю новую команду.</p>",
+    "ts": "2026-07-08T16:46:28.697Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю логин через реальный домен.</p>",
+    "ts": "2026-07-08T16:47:29.140Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обе команды проверены сквозь весь цикл (создание → логин через реальный сервис). Прибираю за собой prod-local стенд.</p>",
+    "ts": "2026-07-08T16:47:36.881Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — обе команды работают и проверены сквозь весь цикл (создание → логин):</p><pre><code>make create-admin-dev email=admin@example.com password=secret123        # dev-стенд (make dev-up/dev-stack), Postgres на localhost:5432\nmake create-admin-prod-local email=admin@example.com password=secret123 # make prod-local-up, сеть coordinator_prod_local_net\n</code></pre><p>Без аргументов — понятная ошибка использования, не голый краш. Добавлены:<br>- <code class=\"inline\">deploy/local/create-admin.sh</code>, <code class=\"inline\">deploy/prod/create-admin-local.sh</code><br>- <code class=\"inline\">Makefile</code>: таргеты <code class=\"inline\">create-admin-dev</code>, <code class=\"inline\">create-admin-prod-local</code></p><p>Тестовые записи (<code class=\"inline\">devtest@example.com</code> в dev, <code class=\"inline\">prodlocaltest@example.com</code> в снесённом уже prod-local) оставил как есть — не подчищал по аналогии с прошлыми тестовыми аккаунтами в этой сессии.</p>",
+    "ts": "2026-07-08T16:47:58.123Z"
   }
 ]
