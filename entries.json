@@ -10121,5 +10121,17 @@
     "who": "claude",
     "html": "<p>Смотрю — и это, по сути, ничего пока нет.</p><p>**Что это:** чистый скелет <code class=\"inline\">api-platform/api-platform</code> (Symfony 8.1, PHP 8.4, FrankenPHP) + рядом <code class=\"inline\">admin/</code> — React+Vite+TS заготовка. Всё сгенерировано, ничего не написано:</p><p>- Единственный файл в <code class=\"inline\">src/ApiResource/</code> — стоковый демо-ресурс <code class=\"inline\">Greetings.php</code> из коробки API Platform (&quot;Hello World&quot; на статичном in-memory провайдере, не через БД).<br>- <code class=\"inline\">api-platform/doctrine-orm</code> в зависимостях есть, но реально Doctrine нигде не подключена — <code class=\"inline\">DATABASE_URL</code> в <code class=\"inline\">compose.yaml</code> смотрит на сервис <code class=\"inline\">database:5432</code>, которого в самом compose-файле просто нет (это стандартная заглушка <code class=\"inline\">dunglas/symfony-docker</code>, которую заполняет <code class=\"inline\">composer require symfony/orm-pack</code> — этот шаг не сделан).<br>- <code class=\"inline\">admin/</code> — тоже нетронутый Vite-скелет (<code class=\"inline\">App.tsx</code>/<code class=\"inline\">main.tsx</code> дефолтные), хотя разок собирался (<code class=\"inline\">dist/</code> есть).<br>- Все таймстампы файлов кучкуются вокруг 14 июня — с тех пор ни строчки.</p><p>**Что смущает:**<br>1. **Нет <code class=\"inline\">.git</code> вообще** — ни в <code class=\"inline\">api/</code>, ни в <code class=\"inline\">admin/</code>, ни в <code class=\"inline\">my-api/</code>. Ничего не версионируется. Если контейнер/диск что-то потеряет — это будет не откат, а полная потеря.<br>2. Контейнер <code class=\"inline\">api-php-1</code> при этом всё это время крутится (<code class=\"inline\">restart: unless-stopped</code>, поднят 14 июня, и сейчас снова &quot;Up 9 hours&quot; — то есть переживал перезагрузки хоста) ради ровным счётом одного demo-эндпоинта. Смысла держать его живым сейчас нет — просто ест RAM.</p><p>Если это заготовка «на будущее» — стоит хотя бы <code class=\"inline\">git init</code> сделать сейчас, пока терять нечего. Если эксперимент уже не нужен — можно погасить (<code class=\"inline\">docker compose down</code> из <code class=\"inline\">/home/ihar/sandbox/my-api/api</code>), ничего не потеряется, поднимется заново командой <code class=\"inline\">docker compose up</code>.</p>",
     "ts": "2026-07-08T17:28:18.392Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>кто запускал контейнер в этом проекте после перезагрузки?</p>",
+    "ts": "2026-07-08T17:29:29.208Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Никто вручную — контейнер поднялся сам, как часть загрузки системы:</p><p>- Хост загрузился в **10:38:14** (<code class=\"inline\">system boot</code>)<br>- Docker-демон стартовал в **10:38:40**<br>- Контейнер <code class=\"inline\">api-php-1</code> запустился в **10:38:32** — прямо в этом же окне</p><p>Причина — политика <code class=\"inline\">restart: unless-stopped</code> в <code class=\"inline\">compose.yaml</code> (см. предыдущий ответ): Docker сам поднимает такие контейнеры при каждом старте демона, без участия человека. <code class=\"inline\">RestartCount: 0</code> подтверждает — с момента этого запуска контейнер не падал и не перезапускался повторно, то есть после ребута это первый и единственный «запуск», и он автоматический.</p>",
+    "ts": "2026-07-08T17:29:51.670Z"
   }
 ]
