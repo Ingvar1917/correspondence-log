@@ -7565,5 +7565,65 @@
     "who": "claude",
     "html": "<p>После <code class=\"inline\">make clean-all</code> кластер и данные снесены, поэтому сначала нужно поднять стенд заново, потом создать админа против его Postgres:</p><pre><code>make dev-up   # пересоздаёт kind-кластер + Postgres + миграции, localhost:5432 доступен напрямую (hostPort в kind-cluster.yaml)\n\n# .env (gitignored) уже содержит POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB\nset -a; source .env; set +a\nDATABASE_URL=&quot;postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5432/$POSTGRES_DB?sslmode=disable&quot; \\\n  go run ./cmd/create-admin -email admin@example.com -password yourpassword123\n</code></pre><p>Если ещё и <code class=\"inline\">make dev-stack</code> (для локального бинаря + UI), Postgres тот же самый — команда <code class=\"inline\">create-admin</code> та же, порядок неважен, главное чтобы <code class=\"inline\">dev-up</code> уже отработал (миграции применены).</p><p><code class=\"inline\">cmd/create-admin</code> — единственный способ завести админа (сознательно нет HTTP-регистрации, см. комментарий в <code class=\"inline\">cmd/create-admin/main.go</code>), гоняется напрямую против <code class=\"inline\">DATABASE_URL</code>, ничего в Makefile под это не заведено.</p>",
     "ts": "2026-07-08T12:40:15.433Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>http://localhost:15174/adminapp не работает<br>http://localhost:15174/adminapp/ работает</p><p>на http://localhost:15174/adminapp случается переход во время навигации по странице и нажатии кнопки перезагрузки так же для http://localhost:15173/app</p>",
+    "ts": "2026-07-08T12:45:02.047Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл причину — она одна и та же для обоих UI, воспроизвёл и подтвердил напрямую:</p>",
+    "ts": "2026-07-08T12:47:11.864Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Что происходит**: <code class=\"inline\">basename=&quot;/app&quot;</code>/<code class=\"inline\">&quot;/adminapp&quot;</code> в React Router (без слэша — стандартная конвенция) + <code class=\"inline\">&lt;Link to=&quot;/&quot;&gt;</code>/<code class=\"inline\">&lt;NavLink to=&quot;/&quot; end&gt;</code> (breadcrumb «Home» в <code class=\"inline\">GamePage.tsx</code>/<code class=\"inline\">PresetsPage.tsx</code>, вкладка «Clusters» в админке) при переходе на корень схлопывают URL в голый <code class=\"inline\">/app</code>/<code class=\"inline\">/adminapp</code> без слэша. Vite dev-server же матчит <code class=\"inline\">base: &#x27;/app/&#x27;</code> только с слэшем — голый путь получает 404 из его же middleware. В проде так не бывает: <code class=\"inline\">internal/coordinator/spa.Handler</code> уже осознанно обрабатывает оба варианта (<code class=\"inline\">spa_test.go:TestRootServesShell</code> явно проверяет <code class=\"inline\">/app</code> и <code class=\"inline\">/app/</code>) — баг чисто dev-server&#x27;ный.</p><p>Фикс — маленький Vite-плагин, редиректящий голый base на base+слэш только в dev.</p>",
+    "ts": "2026-07-08T12:47:24.408Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь то же самое для admindashboardui.</p>",
+    "ts": "2026-07-08T12:47:55.259Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Конфиги обновлены — Vite сам перезапускается при изменении <code class=\"inline\">vite.config.ts</code>. Проверяю.</p>",
+    "ts": "2026-07-08T12:48:11.856Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба сервера перезапустились. Проверяю живьём.</p>",
+    "ts": "2026-07-08T12:48:17.539Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба редиректят корректно. Проверяю, что редирект не сломал основной маршрут и запросы с query-строкой.</p>",
+    "ts": "2026-07-08T12:48:25.834Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё корректно: query-строка сохраняется, посторонние похожие пути (<code class=\"inline\">/adminappXYZ</code>) не перехватываются. Прогоняю тесты обоих UI, чтобы убедиться, что ничего не сломано.</p>",
+    "ts": "2026-07-08T12:48:36.689Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю короткую заметку в CLAUDE.md рядом с уже существующей про слэш в прокси — тот же класс грабли.</p>",
+    "ts": "2026-07-08T12:48:52.298Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Оба dev-сервера обновлены, тесты зелёные (74+23), правки:</p><p>- [dashboardui/vite.config.ts](dashboardui/vite.config.ts) и [admindashboardui/vite.config.ts](admindashboardui/vite.config.ts) — добавлен dev-only плагин <code class=\"inline\">redirectBareBase</code>, редиректит голый <code class=\"inline\">/app</code>/<code class=\"inline\">/adminapp</code> (без слэша) на версию со слэшем (302, сохраняя query-строку).<br>- CLAUDE.md — задокументирована причина.</p><p>**Суть**: react-router <code class=\"inline\">basename</code> (без слэша — его конвенция) + <code class=\"inline\">&lt;Link to=&quot;/&quot;&gt;</code>/<code class=\"inline\">&lt;NavLink to=&quot;/&quot; end&gt;</code> (breadcrumb «Home», вкладка «Clusters») при переходе на корень схлопывают URL в голый путь без слэша. Vite dev-server матчит <code class=\"inline\">base</code> только со слэшем — жёсткий reload/прямой заход на такой URL 404-ил. В проде эта проблема не существует (<code class=\"inline\">spa.Handler</code> уже осознанно обрабатывает оба варианта, есть тест), так что фикс сделан только в dev-конфиге, backend не тронут.</p>",
+    "ts": "2026-07-08T12:49:16.132Z"
   }
 ]
