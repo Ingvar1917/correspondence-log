@@ -8489,5 +8489,17 @@
     "who": "claude",
     "html": "<p>Готово — на этот раз проверено сквозь весь цикл (создание → логин через реальный домен), а не только сам вызов <code class=\"inline\">create-admin</code>.</p><p>**Учётные данные**: <code class=\"inline\">admin@example.com</code> / <code class=\"inline\">localtest123</code> — работают на <code class=\"inline\">http://admin.local.test:8880/</code>.</p><p>**Что произошло раньше**: <code class=\"inline\">.env.local</code> и уже запущенный контейнер Postgres разъехались по кредам (файл был новее контейнера — где-то между прогонами <code class=\"inline\">.env.local</code> перегенерировался/правился, а Postgres не пересоздавался, так что нёс старый пароль). Починил полным циклом <code class=\"inline\">make prod-local-down</code> (сносит с <code class=\"inline\">-v</code>) → удалил <code class=\"inline\">.env.local</code> → <code class=\"inline\">make prod-local-up</code> (сгенерировал заново с нуля) → сверил, что креды в файле и в живом контейнере совпадают, **до** попытки создать админа — теперь это надёжно воспроизводимо.</p><p>**На будущее**: если снова словишь <code class=\"inline\">password authentication failed</code> на этом стенде — не пробуй чинить точечно (<code class=\"inline\">--force-recreate</code> без <code class=\"inline\">-v</code> не помогает, у <code class=\"inline\">postgres</code> образ несёт анонимный volume, переживающий пересоздание контейнера) — сразу <code class=\"inline\">make prod-local-down &amp;&amp; make prod-local-up</code> с нуля.</p>",
     "ts": "2026-07-08T16:31:25.263Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>на каких портах сейчас dashboardui и admindashboardui поднимаются в dev режиме?</p>",
+    "ts": "2026-07-08T16:41:22.062Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**По конфигу** (Vite-дефолты):<br>- <code class=\"inline\">dashboardui</code> — порт не задан в <code class=\"inline\">vite.config.ts</code>, значит дефолт Vite — **5173**<br>- <code class=\"inline\">admindashboardui</code> — явно задан **5174**</p><p>**Но сейчас у тебя реально запущено** (видно в процессах) через <code class=\"inline\">make dev-stack</code>, который передаёт <code class=\"inline\">--port</code> явно:<br>- <code class=\"inline\">dashboardui</code> — **15173** (<code class=\"inline\">http://localhost:15173/app/</code>)<br>- <code class=\"inline\">admindashboardui</code> — **15174** (<code class=\"inline\">http://localhost:15174/adminapp/</code>)</p><p>Если запускать не через <code class=\"inline\">make dev-stack</code>, а напрямую <code class=\"inline\">make dev-indie-ui</code>/<code class=\"inline\">make dev-admin-ui</code> (одиночный Vite без <code class=\"inline\">dev-stack</code>) — будут дефолтные **5173**/**5174**.</p>",
+    "ts": "2026-07-08T16:41:37.233Z"
   }
 ]
