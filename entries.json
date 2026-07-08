@@ -7853,5 +7853,17 @@
     "who": "claude",
     "html": "<p>Готово. Итог:</p><p>- **<code class=\"inline\">cmd/coordinator/main.go</code>** — <code class=\"inline\">AGONES_KUBECONFIG</code>/<code class=\"inline\">CLUSTER_REGION</code> теперь опциональны. Если <code class=\"inline\">AGONES_KUBECONFIG</code> не задан, coordinator стартует с нулём зарегистрированных кластеров и логирует, что первый кластер провижинится через Admin Dashboard (<code class=\"inline\">POST /clusters</code>); если задан — <code class=\"inline\">CLUSTER_REGION</code> по-прежнему обязателен вместе с ним. Doc-комментарий пакета переписан: убрана устаревшая ссылка на «ещё не построенный» Admin Dashboard, явно описана прод-модель (coordinator не привязан ни к какому кластеру, kubeconfig каждого достаётся из <code class=\"inline\">cluster_registry</code> по требованию).<br>- **<code class=\"inline\">main_test.go</code>** — заменил <code class=\"inline\">TestRun_RequiresAgonesKubeconfig</code> на <code class=\"inline\">TestRun_AgonesKubeconfigIsOptional</code> (старт без бутстрапа доходит до реальной попытки подключения к БД, не спотыкаясь на этих двух переменных), <code class=\"inline\">TestRun_RequiresClusterRegion</code> переименован в <code class=\"inline\">TestRun_RequiresClusterRegionWhenKubeconfigSet</code> — регион всё ещё обязателен, если kubeconfig задан.<br>- **<code class=\"inline\">PROJECT_MAP.md</code>** — задокументировано в чек-листе п.6.<br>- **Проверено**: <code class=\"inline\">go build</code>, <code class=\"inline\">go test ./cmd/coordinator/...</code> (все тесты, включая новый, проходят за миллисекунды), <code class=\"inline\">make test-short</code> зелёный, и живьём — собрал бинарь, запустил его напрямую без <code class=\"inline\">AGONES_KUBECONFIG</code>/<code class=\"inline\">CLUSTER_REGION</code> против реальной dev-Postgres: чистый старт с ожидаемым логом, существующие строки <code class=\"inline\">cluster_registry</code> (<code class=\"inline\">dev</code>/<code class=\"inline\">eu</code>/<code class=\"inline\">asia</code>/<code class=\"inline\">us</code>) не тронуты.</p><p>Локальный dev (<code class=\"inline\">make dev-up</code>/<code class=\"inline\">dev-stack</code>) не изменился — обе переменные там по-прежнему выставляются явно, так что твой текущий стенд продолжит работать как раньше.</p>",
     "ts": "2026-07-08T13:21:41.453Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделал пуш</p>",
+    "ts": "2026-07-08T13:22:34.079Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Принято.</p>",
+    "ts": "2026-07-08T13:22:38.161Z"
   }
 ]
