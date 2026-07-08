@@ -6659,5 +6659,53 @@
     "who": "claude",
     "html": "<p>## Готово: Units (внутренняя валюта) + кастомный RAM, этап 1</p><p>**Схема:** <code class=\"inline\">tariffs.ram_mb_max</code> (потолок; <code class=\"inline\">ram_mb_per_session</code> — пол/дефолт), <code class=\"inline\">games.ram_mb</code> (nullable — кастом в границах тарифа), новые таблицы <code class=\"inline\">account_balances</code>/<code class=\"inline\">unit_transactions</code>.</p><p>**Бэкенд:**<br>- <code class=\"inline\">games.Repository.Update</code> валидирует RAM против *эффективного* тарифа (нового, если тариф меняется тем же вызовом), новая <code class=\"inline\">ErrRAMOutOfTariffBounds</code>.<br>- <code class=\"inline\">launcher.go</code> берёт <code class=\"inline\">game.RAMMb</code>, если задан, иначе тарифный дефолт.<br>- Новый пакет <code class=\"inline\">units</code> (<code class=\"inline\">GetBalance</code>/<code class=\"inline\">TopUp</code>, топап — только дискретные события, не леджер каждого тика).<br>- <code class=\"inline\">admindashboard</code>: <code class=\"inline\">GET/POST /accounts/{id}/balance</code>, <code class=\"inline\">/units</code>. <code class=\"inline\">dashboardapi</code>: <code class=\"inline\">GET /account/balance</code>, <code class=\"inline\">ram_mb</code> в create/update.</p><p>**UI:** Indie — кастомный RAM на карточке текущего тарифа (Settings), read-only баланс в шапке списка игр. Admin — баланс + форма топапа (delta+reason, confirm) на строке игры.</p><p>**Проверено:**<br>- <code class=\"inline\">make test</code> — весь Go-набор зелёный (новые тесты в <code class=\"inline\">games</code>, <code class=\"inline\">launcher</code>, <code class=\"inline\">units</code>, <code class=\"inline\">admindashboard</code>, <code class=\"inline\">dashboardapi</code>).<br>- Оба фронта — <code class=\"inline\">tsc</code> чист, все тесты зелёные (74 indie + 18 admin).<br>- Живьём (<code class=\"inline\">make dev-stack</code>): создал игру, задал <code class=\"inline\">ram_mb=256</code> (в границах free-тарифа 128–512), попытка выйти за границы (1000) честно отбита 400 — реальный под в k8s получил <code class=\"inline\">memory: 256Mi</code>, не тарифный дефолт 128Mi. Админ топапнул баланс — индюк увидел изменение мгновенно.<br>- Побочно найдена и починена та же проблема с рассинхронизацией in-cluster образа после новой миграции (уже описанная в WHATIF.md с прошлого раза) — добавил её как отдельную строку-паттерн, раз повторилась дважды за день.</p><p>Документация обновлена (<code class=\"inline\">PROJECT_MAP.md</code> п.12, <code class=\"inline\">WHATIF.md</code>, <code class=\"inline\">INDIE_UI_MAP.md</code>, <code class=\"inline\">ADMIN_UI_MAP.md</code>).</p><p>**Осознанно не в этом этапе (этап 2):** сам метред-луп списания (по <code class=\"inline\">DesiredReplicas × ram_mb × ставка</code>, читает уже собранные <code class=\"inline\">gameserver_metrics</code>) + cost circuit breaker (баланс ≤0 → <code class=\"inline\">launcher.Stop</code>) + уведомление индюку.</p>",
     "ts": "2026-07-08T10:52:34.352Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>живой тест создал для этого куска?</p>",
+    "ts": "2026-07-08T10:53:00.965Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нет, не создал — только ручную проверку curl+kubectl в этой сессии, ничего не осталось как воспроизводимый тест (в отличие от <code class=\"inline\">make test-e2e-provisioning</code>, который сделал в прошлый раз). Исправляю — делаю по тому же паттерну.</p>",
+    "ts": "2026-07-08T10:53:50.954Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Убираю лишние строки с <code class=\"inline\">rt</code>.</p>",
+    "ts": "2026-07-08T10:55:13.400Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю компиляцию под тегом <code class=\"inline\">e2e</code>.</p>",
+    "ts": "2026-07-08T10:55:22.907Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Добавляю цель в Makefile.</p>",
+    "ts": "2026-07-08T10:55:28.550Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь реально прогоняю его.</p>",
+    "ts": "2026-07-08T10:55:47.432Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Запустил в фоне — прогон может занять несколько минут (если e2e-кластер ещё не поднят, установка Agones занимает время). Дождусь уведомления о завершении.</p>",
+    "ts": "2026-07-08T10:57:57.691Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Фоновая команда уже сама уведомит меня о завершении — не нужно ничего дополнительно планировать, жду результата.</p>",
+    "ts": "2026-07-08T10:58:04.678Z"
   }
 ]
