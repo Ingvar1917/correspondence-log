@@ -6905,5 +6905,17 @@
     "who": "claude",
     "html": "<p>Все четыре живых e2e-теста прошли (agones, launcher, builds, provisioning). Root cause: MinIO и registry в <code class=\"inline\">coordinator-dev</code> крутятся без volume, а пересоздающий бакет Job не перезапускался после того, как их поды рестартовали (вероятно, из-за обновления ядра — известная граблина CachyOS/kind) и потеряли данные. Исправления:</p><p>- **Немедленно**: пересоздал бакет <code class=\"inline\">builds</code> и перезалил образы (<code class=\"inline\">bridge-sidecar:dev</code>, <code class=\"inline\">build-unpacker:dev</code>, <code class=\"inline\">gamebase:dev</code>) через <code class=\"inline\">setup-dev-extras.sh</code>.<br>- **В коде**: <code class=\"inline\">deploy/local/setup-dev-extras.sh</code> теперь удаляет <code class=\"inline\">job/minio-bucket</code> перед каждым <code class=\"inline\">apply</code> — раньше уже <code class=\"inline\">Complete</code>-джоба молча не пересоздавала бакет после потери данных MinIO, теперь пересоздание бакета идемпотентно на каждый запуск.</p>",
     "ts": "2026-07-08T11:20:03.355Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделал коммит</p>",
+    "ts": "2026-07-08T11:23:51.548Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Принято.</p>",
+    "ts": "2026-07-08T11:23:57.116Z"
   }
 ]
