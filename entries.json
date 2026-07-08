@@ -8573,5 +8573,95 @@
     "who": "claude",
     "html": "<p>Готово — обе команды работают и проверены сквозь весь цикл (создание → логин):</p><pre><code>make create-admin-dev email=admin@example.com password=secret123        # dev-стенд (make dev-up/dev-stack), Postgres на localhost:5432\nmake create-admin-prod-local email=admin@example.com password=secret123 # make prod-local-up, сеть coordinator_prod_local_net\n</code></pre><p>Без аргументов — понятная ошибка использования, не голый краш. Добавлены:<br>- <code class=\"inline\">deploy/local/create-admin.sh</code>, <code class=\"inline\">deploy/prod/create-admin-local.sh</code><br>- <code class=\"inline\">Makefile</code>: таргеты <code class=\"inline\">create-admin-dev</code>, <code class=\"inline\">create-admin-prod-local</code></p><p>Тестовые записи (<code class=\"inline\">devtest@example.com</code> в dev, <code class=\"inline\">prodlocaltest@example.com</code> в снесённом уже prod-local) оставил как есть — не подчищал по аналогии с прошлыми тестовыми аккаунтами в этой сессии.</p>",
     "ts": "2026-07-08T16:47:58.123Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>docker compose -f docker-compose.local.yml --env-file .env.local down -v</p><p>может убрать -v что бы не чистилась база?</p>",
+    "ts": "2026-07-08T16:49:49.882Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Просто убрать <code class=\"inline\">-v</code> не поможет — Postgres в <code class=\"inline\">docker-compose.local.yml</code> вообще без named volume, только анонимный (из самого образа <code class=\"inline\">postgres:16-alpine</code>). Без <code class=\"inline\">-v</code> анонимный volume не удалится, но и не переиспользуется новым контейнером при следующем <code class=\"inline\">up</code> — просто осиротеет (мы как раз это и наблюдали: куча висящих volume на машине). Данные всё равно потеряются, только вместо чистого пересоздания получишь мусор.</p><p>Настоящий фикс — добавить named volume, как уже сделано в реальном <code class=\"inline\">docker-compose.yml</code> (прод). Тогда <code class=\"inline\">down</code> (без <code class=\"inline\">-v</code>) сохранит данные между циклами, а полный сброс останется доступен через <code class=\"inline\">down -v</code> явно, когда нужно.</p>",
+    "ts": "2026-07-08T16:50:21.647Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю секцию <code class=\"inline\">volumes:</code> в конец файла.</p>",
+    "ts": "2026-07-08T16:50:40.420Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">test-local-down.sh</code> — убираю <code class=\"inline\">-v</code> по умолчанию, добавляю явный флаг для полного сброса.</p>",
+    "ts": "2026-07-08T16:50:51.992Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю Makefile-таргет, чтобы пробрасывать <code class=\"inline\">wipe=1</code>.</p>",
+    "ts": "2026-07-08T16:51:05.200Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю запись в WHATIF.md — я уже ссылаюсь на неё в комментарии, но самой записи не было.</p>",
+    "ts": "2026-07-08T16:51:26.834Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>File ends with a newline after the last row. Appending the new row.</p>",
+    "ts": "2026-07-08T16:51:46.364Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь проверяю сам <code class=\"inline\">test-local-up.sh</code> на устаревшие упоминания и живьём проверяю персистентность.</p>",
+    "ts": "2026-07-08T16:52:11.728Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ничего устаревшего там. Проверяю синтаксис compose-файла и живой цикл down/up с сохранением данных.</p>",
+    "ts": "2026-07-08T16:52:18.621Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Валиден. Теперь полный живой цикл: поднять → создать админа → <code class=\"inline\">down</code> без wipe → снова <code class=\"inline\">up</code> → проверить, что админ жив.</p>",
+    "ts": "2026-07-08T16:52:36.339Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь гашу без <code class=\"inline\">wipe</code> и поднимаю заново — проверяю, что админ пережил цикл.</p>",
+    "ts": "2026-07-08T16:53:36.649Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Volume пережил <code class=\"inline\">down</code>. Проверяю, что админ действительно жив после повторного <code class=\"inline\">up</code>.</p>",
+    "ts": "2026-07-08T16:53:50.867Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тот же <code class=\"inline\">admin_id</code>, логин прошёл — данные пережили <code class=\"inline\">down</code>/<code class=\"inline\">up</code>. Проверяю <code class=\"inline\">wipe=1</code>.</p>",
+    "ts": "2026-07-08T16:53:58.857Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба режима работают правильно. Прибираю тестовый образ.</p>",
+    "ts": "2026-07-08T16:54:04.623Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>- **<code class=\"inline\">docker-compose.local.yml</code>** — Postgres получил именной volume <code class=\"inline\">prod_local_postgres_data</code> (раньше не было вообще никакого, а анонимный volume самого образа <code class=\"inline\">postgres:16-alpine</code> сиротел при пересоздании — та самая причина вчерашнего рассинхрона пароля).<br>- **<code class=\"inline\">test-local-down.sh</code>/<code class=\"inline\">make prod-local-down</code>** — по умолчанию <code class=\"inline\">down</code> без <code class=\"inline\">-v</code>: данные (включая созданного админа) переживают цикл. Полный сброс — <code class=\"inline\">make prod-local-down wipe=1</code>.<br>- **WHATIF.md** — задокументирован корневой баг (анонимный volume против «данные одноразовые», на который я сам сослался в комментарии, но забыл записать).</p><p>**Проверено живьём полным циклом**: создал админа → <code class=\"inline\">make prod-local-down</code> (без wipe) → volume цел → <code class=\"inline\">make prod-local-up</code> → тот же <code class=\"inline\">admin_id</code> логинится успешно. Отдельно проверил <code class=\"inline\">wipe=1</code> — volume реально удаляется.</p>",
+    "ts": "2026-07-08T16:54:14.156Z"
   }
 ]
