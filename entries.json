@@ -7661,5 +7661,95 @@
     "who": "claude",
     "html": "<p>Разобрался. Прогнал тот же запрос дважды напрямую через прокси <code class=\"inline\">:15174</code> (тот же путь, что и браузер) — оба раза успешно (202, ~20-25с на <code class=\"inline\">kind create cluster</code>).</p><p>**Что это за ошибка**: <code class=\"inline\">NetworkError when attempting to fetch resource</code> — это не текст приложения, а сырое сообщение браузерного <code class=\"inline\">fetch()</code>, когда соединение обрывается до получения ответа. В <code class=\"inline\">api/client.ts</code> ([client.ts:15](admindashboardui/src/api/client.ts#L15)) нет <code class=\"inline\">try/catch</code> вокруг <code class=\"inline\">fetch()</code> — если TCP-соединение умирает, <code class=\"inline\">TypeError</code> из <code class=\"inline\">fetch()</code> летит наверх как есть, и <code class=\"inline\">ClustersPage.tsx</code> просто показывает <code class=\"inline\">error.message</code> (для не-<code class=\"inline\">ApiError</code> — ровно этот сырой текст).</p><p>**Почему соединение оборвалось**: <code class=\"inline\">POST /admin/clusters</code> для <code class=\"inline\">kind</code>-облака **синхронно блокируется** на весь <code class=\"inline\">kind create cluster</code> (20с–2+ мин, особенно если сработал недавний self-heal — снос осиротевшего кластера + повторное создание) — это единственный способ работы <code class=\"inline\">KindAdapter.CreateCluster</code>, потому что сам <code class=\"inline\">kind</code> CLI блокирующий по своей природе (в отличие от DO/Vultr, чьи API возвращаются мгновенно, а реальное создание кластера отслеживается поллингом). Я перезапускал <code class=\"inline\">dev-stack</code> (новый <code class=\"inline\">coordinator</code> PID в 14:53, Postgres тоже пересоздался — данные обнулились) прямо в это время — если запрос на создание кластера был в полёте в этот момент, соединение оборвалось именно так.</p><p>**Сейчас всё работает** — оба тестовых запроса прошли штатно. Если ошибка повторится не в момент рестарта стенда — дай знать, покопаю глубже. Отдельно: стоит ли обернуть <code class=\"inline\">fetch()</code> в <code class=\"inline\">client.ts</code> так, чтобы сетевой обрыв показывался понятным текстом («не удалось связаться с сервером»), а не сырым браузерным сообщением?</p>",
     "ts": "2026-07-08T13:01:08.994Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>2026/07/08 14:55:17 [provisioning] kind cluster coordinator-eu already exists but isn&#x27;t tracked — deleting stale cluster and retrying<br>2026/07/08 14:55:36 [provisioning] kind cluster coordinator-asia already exists but isn&#x27;t tracked — deleting stale cluster and retrying<br>2026/07/08 14:56:34 [provisioning] cluster coordinator-eu (kind/eu) ready, registered as f5d5aa5f-bb3c-4e1d-bc3b-00fc0e9a3195<br>2026/07/08 14:57:24 [provisioning] cluster coordinator-asia (kind/asia) ready, registered as cef1fdab-a9f7-445e-9736-bd2ab1eae59d<br>2026/07/08 14:58:12 [provisioning] cluster coordinator-us (kind/us) ready, registered as bb7e2f3f-3eae-45f5-b57c-5faa9cd9081e<br>2026/07/08 14:58:55 [provisioning] kind cluster coordinator-us already exists but isn&#x27;t tracked — deleting stale cluster and retrying<br>2026/07/08 14:59:59 [provisioning] kind cluster coordinator-eu already exists but isn&#x27;t tracked — deleting stale cluster and retrying<br>2026/07/08 15:00:06 [provisioning] cluster coordinator-us (kind/us) ready, registered as bb7e2f3f-3eae-45f5-b57c-5faa9cd9081e<br>2026/07/08 15:01:12 [provisioning] cluster coordinator-eu (kind/eu) ready, registered as f5d5aa5f-bb3c-4e1d-bc3b-00fc0e9a3195<br>2026/07/08 15:02:17 [provisioning] kind cluster coordinator-asia already exists but isn&#x27;t tracked — deleting stale cluster and retrying</p>",
+    "ts": "2026-07-08T13:03:18.582Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это серьёзная проблема — мой вчерашний self-heal-фикс сносит и пересоздаёт уже рабочие кластеры, если на тот же регион прилетает повторный запрос на создание. Разбираюсь.</p>",
+    "ts": "2026-07-08T13:03:55.638Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Смотрю на лог: <code class=\"inline\">eu</code>/<code class=\"inline\">us</code>/<code class=\"inline\">asia</code> были готовы (<code class=\"inline\">ready</code>), а потом через несколько минут self-heal снова «чинил» их же — значит кто-то повторно слал <code class=\"inline\">POST /clusters</code> на уже занятый регион, и мой self-heal вчера радостно **сносил живой, уже зарегистрированный кластер** и пересоздавал его с нуля. Это опасная регрессия: <code class=\"inline\">Manager.Launch</code> вообще не проверяет, не занят ли уже регион, прежде чем звать <code class=\"inline\">CreateCluster</code>. Чиню немедленно — это должно быть жёстким инвариантом, не design-вопросом.</p>",
+    "ts": "2026-07-08T13:04:26.321Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю новый sentinel-error и guard в <code class=\"inline\">Manager.Launch</code>.</p>",
+    "ts": "2026-07-08T13:04:41.845Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь мапирую новую ошибку на HTTP 409 в <code class=\"inline\">admindashboard/errors.go</code>.</p>",
+    "ts": "2026-07-08T13:05:13.052Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую и проверяю существующие тесты provisioning.</p>",
+    "ts": "2026-07-08T13:05:31.007Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, ничего не сломалось. Теперь смотрю на существующие тесты <code class=\"inline\">Manager.Launch</code>, чтобы понять их фейковый провижионер и добавить тест на новую защиту.</p>",
+    "ts": "2026-07-08T13:05:55.243Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю тест на новую защиту после <code class=\"inline\">TestLaunch_PropagatesCreateClusterError</code>.</p>",
+    "ts": "2026-07-08T13:06:27.042Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тесты все зелёные. Проверяю текущее живое состояние — цикл мог оставить <code class=\"inline\">asia</code> недосозданной (лог обрывается на self-heal без последующего <code class=\"inline\">ready</code>).</p>",
+    "ts": "2026-07-08T13:06:45.111Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё сейчас консистентно (<code class=\"inline\">dev</code>/<code class=\"inline\">eu</code>/<code class=\"inline\">asia</code>/<code class=\"inline\">us</code> — все <code class=\"inline\">active</code> и в БД, и физически), но сам цикл разрушения-пересоздания был реальным и мог зацепить живые Fleet&#x27;ы, если бы они там крутились. Причина — мои же повторные тестовые запросы в прошлом шаге плюс отсутствие защиты. Перезапускаю dev-stack с фиксом и проверяю живьём, что повтор теперь блокируется, а не сносит кластер.</p>",
+    "ts": "2026-07-08T13:07:08.329Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Данные сохранились (та же строка <code class=\"inline\">602dbbf2</code> для dev). Пробую повторный provision <code class=\"inline\">eu</code> — теперь должен получить чистый 409, а не снос кластера.</p>",
+    "ts": "2026-07-08T13:07:30.750Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чистый <code class=\"inline\">409 region_already_provisioned</code>, кластер <code class=\"inline\">eu</code> не тронут.</p>",
+    "ts": "2026-07-08T13:07:40.305Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё на месте, <code class=\"inline\">eu</code> с тем же ID (<code class=\"inline\">f5d5aa5f</code>), ничего не пересоздано. Обновляю WHATIF.md — дополняю запись про self-heal новым найденным риском и фиксом.</p>",
+    "ts": "2026-07-08T13:07:51.058Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальный прогон полного набора тестов и уборка.</p>",
+    "ts": "2026-07-08T13:08:16.658Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>**Причина в логе** — регрессия от моего вчерашнего self-heal-фикса: <code class=\"inline\">Manager.Launch</code> вообще не проверял, не провижинен ли уже регион, прежде чем звать <code class=\"inline\">CreateCluster</code>. Повторный <code class=\"inline\">POST /clusters</code> на уже <code class=\"inline\">active</code> регион (в данном случае — мои же тестовые запросы из прошлого шага) снова доходил до <code class=\"inline\">kind create cluster</code>, self-heal видел «уже существует» и **сносил живой, работающий кластер**, пересоздавая с нуля — на реальной инфраструктуре это убило бы любые Fleet&#x27;ы на нём.</p><p>**Фикс**: <code class=\"inline\">Manager.Launch</code> теперь сначала проверяет <code class=\"inline\">ListActiveByRegion</code> — если <code class=\"inline\">(cloud, region)</code> уже занят активным кластером, <code class=\"inline\">CreateCluster</code> не вызывается вообще, наружу чистый <code class=\"inline\">409 region_already_provisioned</code>.</p><p>**Проверено**: новые тесты (<code class=\"inline\">TestLaunch_RejectsAlreadyProvisionedRegion</code> — <code class=\"inline\">CreateCluster</code> подтверждённо не звался; <code class=\"inline\">TestLaunch_AllowsSameRegionDifferentCloud</code> — проверка именно по паре cloud+region) + живьём — перезапустил dev-stack, повторный запрос на <code class=\"inline\">eu</code> дал чистый 409, кластер (тот же ID, тот же физический kind-контейнер) не тронут. <code class=\"inline\">make test-short</code> зелёный. Запись с полным разбором — в WHATIF.md.</p>",
+    "ts": "2026-07-08T13:08:32.534Z"
   }
 ]
