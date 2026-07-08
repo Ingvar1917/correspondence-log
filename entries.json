@@ -7421,5 +7421,137 @@
     "who": "claude",
     "html": "<p>Нашёл причину — это не баг с данными, а реальный пробел в API/UI.</p><p>**Почему так:** «suspended» у индюка нигде не отдаётся. Проверил:<br>- <code class=\"inline\">admindashboard</code> — <code class=\"inline\">adminGameView</code> явно несёт <code class=\"inline\">owner_suspended_at</code> (его же и рисует красная пилюля на скриншоте).<br>- <code class=\"inline\">dashboardapi</code> (indie-сторона) — ни <code class=\"inline\">accountView</code> ([dto.go:47](internal/coordinator/dashboardapi/dto.go#L47)), ни <code class=\"inline\">gameView</code> ([dto.go:60](internal/coordinator/dashboardapi/dto.go#L60)) вообще не содержат поля <code class=\"inline\">suspended_at</code>. Индюк логинится нормально (soft-suspend не блокирует dashboard — блокирует только Public Game API и запуск, <code class=\"inline\">games.ErrAccountSuspended</code> проверяется только в <code class=\"inline\">launcher.Launch</code>/<code class=\"inline\">publicapi</code>), но никакого сигнала о заморозке в его API не приходит.</p><p>Так что «не отображается у индюка» — это буквально «нечему отображаться»: сейчас единственный способ индюку узнать о заморозке — попытаться запустить игру и получить 403 <code class=\"inline\">account_suspended</code>.</p><p>Стоит ли добавить <code class=\"inline\">suspended_at</code> в indie-DTO и баннер в дашборде («ваш аккаунт заморожен администратором»), чтобы индюк не гадал по 403? Это небольшая доработка (поле в двух местах + баннер), не тянет на отдельный план.</p>",
     "ts": "2026-07-08T12:14:18.832Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>[admindashboard] internal error: create kind cluster: kind create cluster coordinator-asia: exit status 1: ERROR: failed to create cluster: node(s) already exist for a cluster with the name &quot;coordinator-asia&quot;</p>",
+    "ts": "2026-07-08T12:19:32.555Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Копнул глубже — нашлись **два разных, но связанных бага** в провижининге кластеров.</p>",
+    "ts": "2026-07-08T12:24:18.517Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Проверил живьём** (<code class=\"inline\">kind get clusters</code>, <code class=\"inline\">docker ps</code>, прямые запросы к Postgres):</p><p>1. **<code class=\"inline\">coordinator-eu</code> физически жива и с Agones** (контейнеры «Up 6 minutes»), но <code class=\"inline\">cluster_registry</code> для неё висит в статусе <code class=\"inline\">deleted</code> — маршрутизация её не видит. Причина: <code class=\"inline\">EnsureRegistered</code> (вызывается из <code class=\"inline\">Manager.finish()</code> при завершении провижининга) делает <code class=\"inline\">UPSERT ... ON CONFLICT (region, cluster_external_id) DO UPDATE SET cloud=…, kubeconfig=…</code> — но **не трогает <code class=\"inline\">status</code>**. Это поведение изначально сделано для статического bootstrap-кластера при рестарте coordinator&#x27;а (<code class=\"inline\">cmd/coordinator/main.go</code> — там осознанно нельзя затирать ручной <code class=\"inline\">drain</code>), но <code class=\"inline\">Manager.finish()</code> унаследовал тот же метод для динамического CRUD — а тут семантика другая: если кластер region <code class=\"inline\">eu</code> уже был <code class=\"inline\">deleted</code>, а потом переприжинён с тем же именем <code class=\"inline\">coordinator-eu</code> (детерминированное имя <code class=\"inline\">&quot;coordinator-&quot;+region</code> в <code class=\"inline\">Manager.Launch</code>), апдейт попадает на старую <code class=\"inline\">deleted</code>-строку и оставляет её мёртвой навсегда, хотя физический кластер только что реально поднят и рабочий.</p><p>2. **<code class=\"inline\">coordinator-asia</code>** — физически существует (контейнеры «Up 2 minutes»), но в БД по нему вообще нет строки. Та же корневая причина: детерминированное имя <code class=\"inline\">&quot;coordinator-&quot;+region</code> без проверки на «а вдруг уже есть орфан» — предыдущая попытка провижининга для этого региона, видимо, успела создать кластер, но упала до записи в БД (или строка потом стала <code class=\"inline\">deleted</code>/удалена так же, как в п.1), и <code class=\"inline\">kind create cluster</code> на повторе честно отказывает: «node(s) already exist».</p><p>Оба бага — следствие того, что имя физического kind-кластера детерминировано по региону, а не уникально на попытку, и <code class=\"inline\">EnsureRegistered</code> не различает «первая регистрация» от «переприжинение после deleted».</p>",
+    "ts": "2026-07-08T12:24:33.771Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Реализую фикс. Сначала self-healing в <code class=\"inline\">KindAdapter.CreateCluster</code>.</p>",
+    "ts": "2026-07-08T12:25:32.969Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь фикс <code class=\"inline\">EnsureRegistered</code> — добавляю вариант, сбрасывающий <code class=\"inline\">status</code>, для динамического провижининга, не трогая bootstrap-путь.</p>",
+    "ts": "2026-07-08T12:25:59.564Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь переключаю <code class=\"inline\">Manager.finish()</code> на новый метод.</p>",
+    "ts": "2026-07-08T12:26:36.120Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую и проверяю существующие тесты.</p>",
+    "ts": "2026-07-08T12:26:52.962Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь пишу тест для <code class=\"inline\">EnsureRegisteredActive</code> и запускаю тесты.</p>",
+    "ts": "2026-07-08T12:27:00.922Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю тесты после <code class=\"inline\">TestEnsureRegistered_IdempotentUpsert</code>.</p>",
+    "ts": "2026-07-08T12:27:13.054Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все тесты проходят, включая новые. Полный <code class=\"inline\">go build</code>/<code class=\"inline\">test-short</code> для верности.</p>",
+    "ts": "2026-07-08T12:27:46.470Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Теперь исправляю текущее сломанное состояние (сирота <code class=\"inline\">coordinator-asia</code>, застрявший <code class=\"inline\">deleted</code> для <code class=\"inline\">coordinator-eu</code>) и проверяю живьём, что фикс реально работает.</p>",
+    "ts": "2026-07-08T12:27:58.757Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Перезапускаю dev-stack, чтобы подхватить новый код, и прогоняю живую проверку фикса.</p>",
+    "ts": "2026-07-08T12:28:10.128Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Coordinator поднялся с новым кодом. Логинюсь как админ и повторяю провижининг <code class=\"inline\">asia</code> (та самая ошибка из отчёта пользователя).</p>",
+    "ts": "2026-07-08T12:28:33.900Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Job создан без ошибки — self-healing сработал. Проверяю лог и жду завершения.</p>",
+    "ts": "2026-07-08T12:29:16.185Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Именно та лог-строка, которую я и закладывал. Теперь жду, пока job дойдёт до <code class=\"inline\">ready</code>, и проверяю статус кластера в БД.</p>",
+    "ts": "2026-07-08T12:29:20.991Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Проверяю итоговый статус кластера в БД (asia должна быть <code class=\"inline\">active</code>, eu — тоже проверю отдельно переприжинением).</p>",
+    "ts": "2026-07-08T12:30:16.795Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">asia</code> заработала с первого раза — <code class=\"inline\">active</code>. Теперь проверяю второй баг: переприжиниваю <code class=\"inline\">eu</code> (застрявший в <code class=\"inline\">deleted</code>) и убеждаюсь, что он оживает, а не остаётся мёртвым.</p>",
+    "ts": "2026-07-08T12:30:24.782Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба бага подтверждены и живьём устранены:</p>",
+    "ts": "2026-07-08T12:32:05.544Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все три кластера теперь <code class=\"inline\">active</code> и видны в Admin UI. Обновляю WHATIF.md записью о находке и фиксе.</p>",
+    "ts": "2026-07-08T12:32:12.983Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю новую строку сразу после существующей про delete-кластера (строка 30).</p>",
+    "ts": "2026-07-08T12:32:25.922Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальный прогон полного тестового набора, чтобы убедиться, что всё по-прежнему зелено, и уборка временных файлов.</p>",
+    "ts": "2026-07-08T12:32:54.492Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>**Причина ошибки** — сирота-кластер <code class=\"inline\">coordinator-asia</code>: физический kind-кластер существовал (от неудачной прошлой попытки провижининга), а строки в БД для него не было. Копнув глубже, нашёл ещё один связанный баг: <code class=\"inline\">coordinator-eu</code> был физически жив с Agones, но в БД висел терминальным <code class=\"inline\">deleted</code> — маршрутизация его не видела.</p><p>**Корень обоих** — <code class=\"inline\">Manager.Launch</code> называет kind-кластер детерминированно (<code class=\"inline\">&quot;coordinator-&quot;+region</code>), а <code class=\"inline\">EnsureRegistered</code> (апсерт при завершении провижининга) не сбрасывает <code class=\"inline\">status</code> при конфликте — это поведение было правильным для bootstrap-кластера при рестарте coordinator&#x27;а, но неверным для динамического CRUD.</p><p>**Фикс** (оба файла): <code class=\"inline\">KindAdapter.CreateCluster</code> теперь self-healing — при «already exist» считает кластер сиротой, сносит и пересоздаёт один раз; новый <code class=\"inline\">clusterregistry.EnsureRegisteredActive</code> (используется только из <code class=\"inline\">Manager.finish</code>) оживляет <code class=\"inline\">status</code> в <code class=\"inline\">active</code> при конфликте, не трогая bootstrap-путь.</p><p>**Проверено**: юнит-тесты (<code class=\"inline\">TestEnsureRegistered_PreservesStatusOnConflict</code>, <code class=\"inline\">TestEnsureRegisteredActive_RevivesDeletedStatusOnConflict</code>) + живьём через реальный Admin API — оба сироты (<code class=\"inline\">asia</code> и <code class=\"inline\">eu</code>) переприжинены без ошибок, оба теперь <code class=\"inline\">active</code> в <code class=\"inline\">GET /admin/clusters</code>. <code class=\"inline\">go build</code>/<code class=\"inline\">make test-short</code> зелёные. Запись с полным разбором и доказательствами — в WHATIF.md.</p>",
+    "ts": "2026-07-08T12:33:13.231Z"
   }
 ]
