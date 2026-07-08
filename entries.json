@@ -8051,5 +8051,41 @@
     "who": "claude",
     "html": "<p>Готово. Итог:</p><p>- **<code class=\"inline\">Caddyfile</code>** — три доменных блока (<code class=\"inline\">API_DOMAIN</code>/<code class=\"inline\">APP_DOMAIN</code>/<code class=\"inline\">ADMIN_DOMAIN</code>), у <code class=\"inline\">app</code>/<code class=\"inline\">admin</code> — условный рерайт (<code class=\"inline\">rewrite @needsPrefix ...</code>), который добавляет <code class=\"inline\">/app</code>/<code class=\"inline\">/adminapp</code> только к путям, которые ещё не начинаются с него или с соответствующего API-префикса (<code class=\"inline\">/dashboard</code>, <code class=\"inline\">/admin</code>) — иначе рерайт задвоился бы.<br>- **<code class=\"inline\">docker-compose.yml</code>**/**<code class=\"inline\">.env.example</code>** — под три переменные вместо одной.<br>- **<code class=\"inline\">README.md</code>** — обновлены шаги 2/5/8/9, плюс явная оговорка: разделение по доменам сейчас косметическое (Caddy-уровень), не жёсткая изоляция на бэкенде — если понадобится настоящая (coordinator сам различает домены и не отвечает на чужом), это отдельная, более инвазивная задача (Host-based роутинг в Go + отдельная сборка фронтов с <code class=\"inline\">base: &#x27;/&#x27;</code>).</p><p>**Проверено живьём**: поднял Caddy с этим же рерайт-конфигом против тестового echo-сервера и curl&#x27;ом с разными <code class=\"inline\">Host</code>-заголовками — все шесть комбинаций (корень/статика/API на каждом домене) дали ровно ожидаемые пути, без задвоения префикса и без порчи API-путей.</p>",
     "ts": "2026-07-08T13:54:01.498Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>можно локально проверить билды фронтов если я /etc/hosts пропишу домены?</p>",
+    "ts": "2026-07-08T13:55:01.820Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Да, можно — но с одной оговоркой: Let&#x27;s Encrypt так работать не будет (ACME-серверы резолвят домен сами, с настоящего интернета — твой локальный <code class=\"inline\">/etc/hosts</code> они не видят), так что для локальной проверки нужно временно убрать автоматический HTTPS и погонять по голому HTTP. Проверю прямо сейчас на полном стеке (Postgres+coordinator+Caddy), чтобы дать не теоретический, а подтверждённый ответ.</p>",
+    "ts": "2026-07-08T13:55:41.564Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все три контейнера подняты. Теперь проверяю через <code class=\"inline\">curl --resolve</code> (безопасный аналог правки <code class=\"inline\">/etc/hosts</code> — не трогает системный файл).</p>",
+    "ts": "2026-07-08T13:57:13.829Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полное подтверждение на реальном coordinator&#x27;е (не заглушке): каждый домен отдаёт то, что должен — <code class=\"inline\">app.local.test</code> показывает Indie Dashboard (<code class=\"inline\">&lt;title&gt;Indie Dashboard&lt;/title&gt;</code>), <code class=\"inline\">admin.local.test</code> — Admin Dashboard, API-пути (<code class=\"inline\">/dashboard/games</code>, <code class=\"inline\">/admin/auth/login</code>) не задвоились и дошли до настоящих хендлеров (<code class=\"inline\">401</code>, не <code class=\"inline\">404</code>), <code class=\"inline\">api.local.test</code> отдаёт Public Game API. Прибираю за собой.</p>",
+    "ts": "2026-07-08T13:57:27.933Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Восстановлено правильно (обратно с автоматическим HTTPS, без <code class=\"inline\">http://</code>). Всё прибрано.</p>",
+    "ts": "2026-07-08T13:58:00.523Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Итог по твоему вопросу:</p><p>**Да, можно**, но с оговоркой: Let&#x27;s Encrypt так не заработает — ACME-серверы резолвят домен со своих серверов, а не через твой локальный <code class=\"inline\">/etc/hosts</code>, так что для локальной проверки нужно временно убрать <code class=\"inline\">https://</code>-часть (просто протестировать по голому HTTP тем же <code class=\"inline\">Caddyfile</code>).</p><p>Я проверил именно так — полным стеком (Postgres + реальный собранный образ coordinator&#x27;а + Caddy), подставив домены через <code class=\"inline\">curl --resolve</code> (безопаснее правки <code class=\"inline\">/etc/hosts</code> — не трогает системный файл, работает только для конкретного запроса). Все три домена отработали правильно на реальном бэкенде: <code class=\"inline\">app.local.test/</code> → indie dashboard, <code class=\"inline\">admin.local.test/</code> → admin dashboard, API-пути не задвоились.</p><p>Если хочешь именно через браузер (не curl) — та же идея: допиши три строки в <code class=\"inline\">/etc/hosts</code> (<code class=\"inline\">127.0.0.1 api.test app.test admin.test</code>, нужны права root на правку файла), временно замени в <code class=\"inline\">Caddyfile</code> <code class=\"inline\">{$API_DOMAIN} {</code> на <code class=\"inline\">http://{$API_DOMAIN} {</code> (и так для всех трёх — Caddy тогда не будет пытаться получить сертификат), подними <code class=\"inline\">docker compose up -d</code> и открой <code class=\"inline\">http://app.test/</code> и <code class=\"inline\">http://admin.test/</code> — не забудь потом вернуть <code class=\"inline\">Caddyfile</code> обратно перед реальным деплоем.</p>",
+    "ts": "2026-07-08T13:58:13.323Z"
   }
 ]
