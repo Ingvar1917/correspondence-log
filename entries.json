@@ -10049,5 +10049,35 @@
     "who": "claude",
     "html": "<p>WinBoat снесён полностью: контейнер, образ (<code class=\"inline\">ghcr.io/dockur/windows:5.14</code>), сеть <code class=\"inline\">winboat_default</code>, диск виртуалки <code class=\"inline\">/home/ihar/winboat</code> (14GB) и конфиг <code class=\"inline\">/home/ihar/.winboat</code> — всё удалено, проверено.</p>",
     "ts": "2026-07-08T17:17:06.227Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>agones-e2e-down             Снести e2e-кластер с Agones<br>  test-e2e-builds             Прогнать e2e билд-пайплайна (вкл. пресеты) против уже поднятого<br>## dev-кластера — нужен make dev-up (+ make dev-stack хоть раз, чтобы MinIO/registry/образы<br>## build-unpacker:dev и gamebase:dev были готовы); сам кластер не поднимает — dev-up<br>## обнуляет Postgres, дёргать его автоматически из тестовой цели небезопасно<br>  test-e2e-provisioning       Прогнать живой CRUD кластеров (create→ready→drain→delete) на<br>## реальном, одноразовом kind-кластере через provisioning.KindAdapter — САМ его поднимает<br>## и сносит (даже при фейле, t.Cleanup), никакой другой кластер не нужен; нужны только<br>## kind/kubectl/helm в PATH и запущенный Docker<br>  test-e2e-launcher           Прогнать живой launcher.Launch против реального Agones (переиспользует<br>## agones-e2e-кластер, те же образы fakegame:e2e/bridge-sidecar:e2e) — проверяет, что<br>## games.Game.RAMMb (custom RAM в рамках тарифа) реально доходит до resources.requests<br>## настоящего пода, не только до Fleet-объекта, который строит наш же код<br>  test-e2e-all                Прогнать все живые e2e-тесты подряд — agones/launcher переиспользуют один<br>## agones-e2e-кластер (сами поднимают при необходимости), provisioning поднимает и сносит<br>  свой одноразовый kind-кластер сам; builds — единственный, что не самодостаточен         если<br>## make dev-up не поднят, честно скипает с подсказкой (дёргать dev-up автоматически<br>## небезопасно — обнуляет Postgres), а не падает<br>  test-all                    Прогнать весь набор тестов — Go + оба UI + живой e2e против реального Agones<br>  prod-local-up               Поднять прод-топологию (Postgres+coordinator из исходников+Caddy с доменным<br>## роутингом) локально тестовыми доменами (api/app/admin.local.test), без реального DO-аккаунта<br>## и без Let&#x27;s Encrypt (deploy/prod/Caddyfile.local — голый HTTP на портах 8880/8443, не 80/443) —<br>  проверяет ровно то, что придётся деплою на дроплет        три домена → правильные рерайты пути →<br>## настоящий coordinator за ними. Генерирует deploy/prod/.env.local сам при первом запуске<br>  prod-local-down             Погасить make prod-local-up (данные Postgres переживают — именной volume). Полный сброс — make prod-local-down wipe=1<br>  create-admin-prod-local     Завести админа на make prod-local-up (своя сеть/креды) — make create-admin-prod-local email=a@b.c password=secret<br>  clean-all                   Полная очистка — kind-кластеры, Docker-образы/контейнеры, бинарники, test cache<br>  tidy                        Обновить зависимости и go.sum<br>  help                        Показать это сообщение (по умолчанию)</p><p>нужно что бы комментарии не мешали читать комманды</p>",
+    "ts": "2026-07-08T17:19:25.679Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Подтверждено: 17 строк-продолжений многострочных <code class=\"inline\">##</code>-комментариев (описания, перенесённые на несколько строк) <code class=\"inline\">help</code> сейчас грепает как есть и выводит вперемешку с командами. Фикс — грепать только заголовочные строки вида <code class=\"inline\">## имя: описание</code>.</p>",
+    "ts": "2026-07-08T17:20:01.072Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Многострочные описания сейчас просто обрезаются до первой строки — лучше склеить их в одну строку через awk, чтобы не терять текст.</p>",
+    "ts": "2026-07-08T17:20:31.330Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Работает — каждая команда теперь ровно одна строка (комментарии-продолжения склеены), даже длинные описания просто переносятся терминалом, а не ломают таблицу отдельными псевдо-строками. Обновляю <code class=\"inline\">help</code> в Makefile.</p>",
+    "ts": "2026-07-08T17:20:42.036Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Работает через <code class=\"inline\">make help</code> напрямую (не только из скрипта). Каждая команда — ровно одна строка, длинные описания просто переносятся терминалом, а не разваливаются на псевдо-строки без отступа. Правка только в <code class=\"inline\">Makefile:243</code>, содержимое комментариев не трогал.</p>",
+    "ts": "2026-07-08T17:20:52.220Z"
   }
 ]
