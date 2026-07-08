@@ -6989,5 +6989,17 @@
     "who": "claude",
     "html": "<p>Готово. Итог:</p><p>1. **Причина ошибки** — известный баг (WHATIF.md, найден 2026-07-06): у MinIO/registry в dev-кластере не было volume, рестарт пода стирал всё. Тестовый пресет был загружен до одного из таких рестартов — его <code class=\"inline\">server.tar.gz</code> физически пропал, а строка в БД осталась с <code class=\"inline\">server_status=&#x27;ready&#x27;</code>.<br>2. **Постоянный фикс** — добавил <code class=\"inline\">PersistentVolumeClaim</code> + <code class=\"inline\">volumeMounts</code> + <code class=\"inline\">strategy: Recreate</code> в [minio.yaml](deploy/local/minio.yaml) и [registry.yaml](deploy/local/registry.yaml) (дефолтный kind storageclass <code class=\"inline\">standard</code>/local-path). Проверил живьём: <code class=\"inline\">kubectl delete pod</code> на оба Deployment&#x27;а — содержимое бакета и registry пережило пересоздание пода.<br>3. **Разблокировка**: удалил битую строку пресета из БД (данных всё равно не существует физически) — пересоздайте пресет через Admin UI, новый переживёт любой будущий рестарт.<br>4. <code class=\"inline\">make test-e2e-builds</code> зелёный, WHATIF.md обновлён.</p>",
     "ts": "2026-07-08T11:35:24.818Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>выходит сейчас нужен менеджер пресетов, что бы можно было загружать пресеты разных игр, пресет будет содержать архив сервера и клиенты игры windows linux macos, так же нужно указывать на каком движке был сделан пресет и указать ссылку на публичный репозиторий, что думаешь?</p>",
+    "ts": "2026-07-08T11:38:50.189Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Менеджер уже почти есть — [presets/repository.go](internal/coordinator/presets/repository.go:46) хранит серверный архив + client-артефакты по трём ОС, и CRUD/аплоад/пикер в обоих UI уже реализованы (прошлая сессия). Реального дельта тут два новых поля: <code class=\"inline\">engine</code> и <code class=\"inline\">repo_url</code>.</p><p>Единственная развилка — <code class=\"inline\">engine</code> свободным текстом или закрытым списком (Unity/Unreal/Godot/Custom + CHECK-constraint, как уже сделано для <code class=\"inline\">server_archive_format</code>). Я бы взял закрытый список: он даёт индюку фильтр «покажи только Unity-пресеты» в <code class=\"inline\">/presets</code>, а свободный текст такого не даёт и множит опечатки-дубликаты («unity»/«Unity3D»/...). <code class=\"inline\">repo_url</code> — просто nullable text, тут спорить не о чем.</p><p>Стоит ли считать это отдельным этапом (миграция + admin-форма + отображение в PresetPicker) или добавить прямо в текущую схему?</p>",
+    "ts": "2026-07-08T11:39:14.400Z"
   }
 ]
