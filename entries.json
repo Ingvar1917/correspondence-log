@@ -7637,5 +7637,29 @@
     "who": "claude",
     "html": "<p>Да — это тот же самый физический кластер, в котором крутится всё: <code class=\"inline\">coordinator-dev</code> (см. <code class=\"inline\">kind get clusters</code>) хостит и сам coordinator, и Postgres, и MinIO, и registry, и (в единственном dev-кластере) Fleet&#x27;ы игр. Он попадает в <code class=\"inline\">cluster_registry</code> не как «отдельный игровой кластер», а через статический bootstrap при старте процесса (<code class=\"inline\">cmd/coordinator/main.go:217</code>, <code class=\"inline\">EnsureRegistered</code> по <code class=\"inline\">CLUSTER_*</code> env-переменным) — просто чтобы в single-cluster локальной разработке Fleet&#x27;ы можно было шедулить туда же, где всё остальное.</p><p>**Если его удалить** (сначала Drain, потом станет активна кнопка Delete) — <code class=\"inline\">Manager.Deprovision</code> дёрнет <code class=\"inline\">KindAdapter.DeleteCluster(&quot;coordinator-dev&quot;)</code> → <code class=\"inline\">kind delete cluster --name coordinator-dev</code>. Это снесёт **весь kind-кластер целиком**: и coordinator, и Postgres (данные пропадут), и MinIO/registry — не «упадёт координатор», а перестанет существовать вся dev-инфраструктура разом.</p><p>Единственный барьер, который сейчас может это остановить — проверка <code class=\"inline\">game_regions</code> (<code class=\"inline\">CountRegionsByCluster</code>): если на этот кластер ссылается хоть один регион игры, <code class=\"inline\">Deprovision</code> откажет <code class=\"inline\">409 cluster_in_use</code>. Но если игр там нет — ничего не помешает снести его через тот же флоу, что и любой обычный кластер.</p><p>Это реальный архитектурный риск: у бутстрап-кластера нет никакой защиты «это тот самый кластер, в котором ты сам работаешь» — UI не отличает его от честно провижененного <code class=\"inline\">kind/eu</code>. В проде такого не бывает (координатор там не делит кластер с игровыми Fleet&#x27;ами), это чисто local-dev артефакт single-cluster сетапа. Хочешь, добавлю защиту (например, запрет drain/delete для bootstrap-кластера, если он один в системе, или явную метку в БД)?</p>",
     "ts": "2026-07-08T12:55:40.547Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>NetworkError when attempting to fetch resource. при создании новых кластеров</p>",
+    "ts": "2026-07-08T12:57:08.031Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Логинюсь через тот же прокси, что и браузер (<code class=\"inline\">:15174</code>), и создаю кластер, замеряя реальное время запроса.</p>",
+    "ts": "2026-07-08T12:58:45.799Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Пробую воспроизвести напрямую через тот же прокси, что использует браузер (<code class=\"inline\">:15174</code>).</p>",
+    "ts": "2026-07-08T12:59:55.227Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Разобрался. Прогнал тот же запрос дважды напрямую через прокси <code class=\"inline\">:15174</code> (тот же путь, что и браузер) — оба раза успешно (202, ~20-25с на <code class=\"inline\">kind create cluster</code>).</p><p>**Что это за ошибка**: <code class=\"inline\">NetworkError when attempting to fetch resource</code> — это не текст приложения, а сырое сообщение браузерного <code class=\"inline\">fetch()</code>, когда соединение обрывается до получения ответа. В <code class=\"inline\">api/client.ts</code> ([client.ts:15](admindashboardui/src/api/client.ts#L15)) нет <code class=\"inline\">try/catch</code> вокруг <code class=\"inline\">fetch()</code> — если TCP-соединение умирает, <code class=\"inline\">TypeError</code> из <code class=\"inline\">fetch()</code> летит наверх как есть, и <code class=\"inline\">ClustersPage.tsx</code> просто показывает <code class=\"inline\">error.message</code> (для не-<code class=\"inline\">ApiError</code> — ровно этот сырой текст).</p><p>**Почему соединение оборвалось**: <code class=\"inline\">POST /admin/clusters</code> для <code class=\"inline\">kind</code>-облака **синхронно блокируется** на весь <code class=\"inline\">kind create cluster</code> (20с–2+ мин, особенно если сработал недавний self-heal — снос осиротевшего кластера + повторное создание) — это единственный способ работы <code class=\"inline\">KindAdapter.CreateCluster</code>, потому что сам <code class=\"inline\">kind</code> CLI блокирующий по своей природе (в отличие от DO/Vultr, чьи API возвращаются мгновенно, а реальное создание кластера отслеживается поллингом). Я перезапускал <code class=\"inline\">dev-stack</code> (новый <code class=\"inline\">coordinator</code> PID в 14:53, Postgres тоже пересоздался — данные обнулились) прямо в это время — если запрос на создание кластера был в полёте в этот момент, соединение оборвалось именно так.</p><p>**Сейчас всё работает** — оба тестовых запроса прошли штатно. Если ошибка повторится не в момент рестарта стенда — дай знать, покопаю глубже. Отдельно: стоит ли обернуть <code class=\"inline\">fetch()</code> в <code class=\"inline\">client.ts</code> так, чтобы сетевой обрыв показывался понятным текстом («не удалось связаться с сервером»), а не сырым браузерным сообщением?</p>",
+    "ts": "2026-07-08T13:01:08.994Z"
   }
 ]
