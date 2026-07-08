@@ -8453,5 +8453,41 @@
     "who": "claude",
     "html": "<p>Логин прошёл успешно через <code class=\"inline\">admin.local.test:8880</code>.</p><p>**Учётные данные**: <code class=\"inline\">admin@example.com</code> / <code class=\"inline\">localtest123</code></p><p>**Команда** (сеть/креды <code class=\"inline\">prod-local</code>, отличается от README-варианта для реального прода):<br>\u0000FENCE0\u0000</p><p>По пути споткнулся о постороннюю проблему: <code class=\"inline\">postgres:16-alpine</code> несёт анонимный volume (объявлен в самом образе), который переживает <code class=\"inline\">--force-recreate</code> без <code class=\"inline\">-v</code> — старый пароль оставался в данных, новый <code class=\"inline\">.env.local</code> игнорировался. Пересобрал стек через <code class=\"inline\">make prod-local-down &amp;&amp; make prod-local-up</code> (<code class=\"inline\">down -v</code> в <code class=\"inline\">test-local-down.sh</code> подчищает это правильно) — сейчас всё свежее и рабочее. Заодно заметил кучу несвязанных с проектом «висящих» anonymous-volume на машине — не трогал, не мои.</p><p>Теперь можешь зайти на <code class=\"inline\">http://admin.local.test:8880/</code> этими же данными.</p>",
     "ts": "2026-07-08T14:38:24.463Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>set -a; source deploy/prod/.env.local; set +a<br>docker run --rm --network coordinator_prod_local_net \\<br>  -v &quot;$(pwd)&quot;:/src -w /src \\<br>  golang:1.26-alpine sh -c &quot;<br>    go build -o /tmp/create-admin ./cmd/create-admin &amp;&amp;<br>    DATABASE_URL=postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB?sslmode=disable \\<br>    /tmp/create-admin -email admin@example.com -password &#x27;localtest123&#x27;<br>  &quot; 2&gt;&amp;1 | tail -5<br>go: downloading github.com/jackc/pgpassfile v1.0.0<br>go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761<br>go: downloading golang.org/x/text v0.37.0<br>go: downloading golang.org/x/sync v0.20.0<br>2026/07/08 16:27:09 [create-admin] create admin: insert admin: failed to connect to <code class=\"inline\">user=coordinator database=coordinator</code>: 172.25.0.2:5432 (postgres): failed SASL auth: FATAL: password authentication failed for user &quot;coordinator&quot; (SQLSTATE 28P01)</p>",
+    "ts": "2026-07-08T16:27:37.941Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл настоящую причину — это не мелочь, а структурная коллизия имён. У обоих compose-файлов (<code class=\"inline\">docker-compose.yml</code> и <code class=\"inline\">.local.yml</code>) в одной директории <code class=\"inline\">deploy/prod</code> **одинаковое имя проекта по умолчанию** («prod» — берётся из имени папки), поэтому оба порождают контейнер <code class=\"inline\">prod-postgres-1</code>. Где-то раньше поднимался настоящий <code class=\"inline\">docker-compose.yml</code> (или его тестовый прогон) с другими кредами — и <code class=\"inline\">.local</code>-стек молча переиспользовал тот же контейнер вместо своего.</p>",
+    "ts": "2026-07-08T16:28:24.624Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хватит гадать — состояние просто рассинхронизировалось (файл <code class=\"inline\">.env.local</code> новее, чем контейнер Postgres). Делаю полный чистый пересбор: снос с <code class=\"inline\">-v</code>, удаление <code class=\"inline\">.env.local</code>, свежий подъём, и сразу проверяю креды до создания админа.</p>",
+    "ts": "2026-07-08T16:28:57.505Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю, что креды в контейнере и в файле теперь совпадают, прежде чем создавать админа.</p>",
+    "ts": "2026-07-08T16:30:51.444Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Совпадает, миграции прошли. Создаю админа и сразу проверяю логин.</p>",
+    "ts": "2026-07-08T16:31:01.150Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — на этот раз проверено сквозь весь цикл (создание → логин через реальный домен), а не только сам вызов <code class=\"inline\">create-admin</code>.</p><p>**Учётные данные**: <code class=\"inline\">admin@example.com</code> / <code class=\"inline\">localtest123</code> — работают на <code class=\"inline\">http://admin.local.test:8880/</code>.</p><p>**Что произошло раньше**: <code class=\"inline\">.env.local</code> и уже запущенный контейнер Postgres разъехались по кредам (файл был новее контейнера — где-то между прогонами <code class=\"inline\">.env.local</code> перегенерировался/правился, а Postgres не пересоздавался, так что нёс старый пароль). Починил полным циклом <code class=\"inline\">make prod-local-down</code> (сносит с <code class=\"inline\">-v</code>) → удалил <code class=\"inline\">.env.local</code> → <code class=\"inline\">make prod-local-up</code> (сгенерировал заново с нуля) → сверил, что креды в файле и в живом контейнере совпадают, **до** попытки создать админа — теперь это надёжно воспроизводимо.</p><p>**На будущее**: если снова словишь <code class=\"inline\">password authentication failed</code> на этом стенде — не пробуй чинить точечно (<code class=\"inline\">--force-recreate</code> без <code class=\"inline\">-v</code> не помогает, у <code class=\"inline\">postgres</code> образ несёт анонимный volume, переживающий пересоздание контейнера) — сразу <code class=\"inline\">make prod-local-down &amp;&amp; make prod-local-up</code> с нуля.</p>",
+    "ts": "2026-07-08T16:31:25.263Z"
   }
 ]
