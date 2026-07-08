@@ -6779,5 +6779,17 @@
     "who": "claude",
     "html": "<p>Готово.</p><p>**Добавил живой e2e-тест**, которого не хватало: <code class=\"inline\">make test-e2e-launcher</code> (<code class=\"inline\">internal/coordinator/launcher/e2e_test.go</code>) — реальный <code class=\"inline\">launcher.Launch()</code> против настоящего Agones-контроллера (переиспользует <code class=\"inline\">agones-e2e</code>-кластер), проверяет, что <code class=\"inline\">games.Game.RAMMb</code> доходит до <code class=\"inline\">resources.requests.memory</code> реального пода, а не только до Fleet-объекта, который строит наш же код.</p><p>По ходу нашёл и починил реальную проблему: <code class=\"inline\">coordinator-agones-e2e</code> кластер никогда не размечался лейблом тарифа (его собственный e2e-тест это обходит, вызывая <code class=\"inline\">agones.Client.CreateFleet</code> напрямую без <code class=\"inline\">nodeSelector</code>) — с настоящим <code class=\"inline\">launcher.Launch</code> под просто зависал в Pending. Плюс лейбл <code class=\"inline\">agones.dev/fleet</code> оказался на объекте <code class=\"inline\">GameServer</code>, а не на Pod&#x27;е — пришлось поправить логику поиска пода в тесте.</p><p>**Прогнал живьём: PASS за 2.6с**, Fleet после теста подтверждённо удалён.</p><p>Обновил <code class=\"inline\">CLAUDE.md</code> (команда + новая грабля про лейбл), <code class=\"inline\">WHATIF.md</code> (дополнил существующую строку про неразмеченные ноды) и <code class=\"inline\">PROJECT_MAP.md</code> п.12 (ссылка на воспроизводимый e2e вместо только ручной проверки). <code class=\"inline\">make test-short</code> — обычный прогон не задет.</p>",
     "ts": "2026-07-08T11:04:58.107Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>Проверь результат фонового прогона go test -tags e2e ./internal/coordinator/launcher/... (id b48crkz4d) и продолжи работу над живым e2e-тестом для custom RAM.</p>",
+    "ts": "2026-07-08T11:05:00.135Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Уже сделано — это сработал запланированный будильник на уже выполненную задачу. Кратко резюме, чтобы не дублировать работу:</p><p>1. Прогон <code class=\"inline\">b48crkz4d</code> (первая попытка после разметки нод) — упал с тем же таймаутом.<br>2. Разобрался почему: лейбл <code class=\"inline\">agones.dev/fleet</code> висит на объекте **GameServer**, не на Pod&#x27;е — мой селектор пода искал не там. Поправил <code class=\"inline\">waitForFleetPod</code>, чтобы сначала брать имя GameServer&#x27;а по этому лейблу, потом — под с тем же именем.<br>3. Перезапустил <code class=\"inline\">test-e2e-launcher</code> — **PASS за 2.6с**, реальный под получил <code class=\"inline\">memory: 200Mi</code> (кастомный RAM), не тарифный дефолт 128Mi.<br>4. Проверил, что Fleet после теста удалён, <code class=\"inline\">make test-short</code> не задет.<br>5. Обновил документацию (<code class=\"inline\">CLAUDE.md</code>, <code class=\"inline\">WHATIF.md</code>, <code class=\"inline\">PROJECT_MAP.md</code>) — уже отправил тебе итоговое сообщение с этим отчётом.</p><p>Новых действий по этому куску не требуется — <code class=\"inline\">make test-e2e-launcher</code> зелёный и закоммичен в рабочее дерево (не в git, как обычно оставляю коммит на твоё усмотрение).</p>",
+    "ts": "2026-07-08T11:05:12.997Z"
   }
 ]
