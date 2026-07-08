@@ -10031,5 +10031,23 @@
     "who": "claude",
     "html": "<p>Готово. Итого освобождено **~68 GB**: build cache 61.8 GB, dangling volumes 280 MB, dangling images 2.5 GB, coordinator/dev/e2e теговые образы (включая устаревший <code class=\"inline\">kindest/node:v1.34.8</code>) ~2.4 GB.</p><p>Не трогал: <code class=\"inline\">kindest/node:v1.35.0</code> (актуальный пин), а также контейнеры/образы/volumes других твоих проектов (workbooth_portable, fastapi-demo, WinBoat и т.п.) — они не относятся к coordinator и продолжают работать как есть.</p><p>Следующий <code class=\"inline\">make dev-up</code>/<code class=\"inline\">test-e2e-*</code> пересоберёт/перезагрузит стёртые образы с нуля (без тёплого build-кэша) — это ожидаемо и однократно.</p>",
     "ts": "2026-07-08T17:15:28.617Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>winboat все останови и снеси с корнями</p>",
+    "ts": "2026-07-08T17:15:54.985Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">/home/ihar/winboat</code> — это 14 GB (сам диск Windows-виртуалки). Уточню, прежде чем сносить безвозвратно.</p>",
+    "ts": "2026-07-08T17:16:21.459Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>WinBoat снесён полностью: контейнер, образ (<code class=\"inline\">ghcr.io/dockur/windows:5.14</code>), сеть <code class=\"inline\">winboat_default</code>, диск виртуалки <code class=\"inline\">/home/ihar/winboat</code> (14GB) и конфиг <code class=\"inline\">/home/ihar/.winboat</code> — всё удалено, проверено.</p>",
+    "ts": "2026-07-08T17:17:06.227Z"
   }
 ]
