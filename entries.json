@@ -8009,5 +8009,47 @@
     "who": "claude",
     "html": "<p>Да, легко — Caddy поддерживает несколько доменных блоков в одном <code class=\"inline\">Caddyfile</code>, каждый получает свой сертификат автоматически. Оба домена просто проксируются на тот же <code class=\"inline\">coordinator:8080</code> — indie и admin UI как раздавались одним Go-процессом по разным путям (<code class=\"inline\">/app/</code>, <code class=\"inline\">/adminapp/</code>), так и продолжат, просто через два имени вместо одного.</p><pre><code>\n# Caddyfile\n{$APP_DOMAIN} {\n\treverse_proxy coordinator:8080\n}\n\n{$ADMIN_DOMAIN} {\n\treverse_proxy coordinator:8080\n}\n</code></pre><p>В <code class=\"inline\">.env</code> вместо <code class=\"inline\">DOMAIN</code> — <code class=\"inline\">APP_DOMAIN=app.example.com</code>, <code class=\"inline\">ADMIN_DOMAIN=admin.example.com</code>, оба прописаны A-записью на тот же IP. В <code class=\"inline\">docker-compose.yml</code> у сервиса <code class=\"inline\">caddy</code> заменить <code class=\"inline\">DOMAIN: ${DOMAIN}</code> на обе переменные.</p><p>**Куки не пересекутся** — <code class=\"inline\">dashboard_session</code>/<code class=\"inline\">admin_session</code> ставятся без атрибута <code class=\"inline\">Domain</code> (только <code class=\"inline\">Path: &quot;/&quot;</code>, см. <code class=\"inline\">cookie.go</code>), значит браузер по умолчанию скопит их строго на хост, с которого пришёл ответ — сессия индюка с <code class=\"inline\">app.example.com</code> физически не видна на <code class=\"inline\">admin.example.com</code>, и наоборот. Это уже так даже без разделения доменов, разделение доменов только усиливает изоляцию.</p><p>**Но URL останутся с суффиксом** — <code class=\"inline\">https://app.example.com/app/...</code> и <code class=\"inline\">https://admin.example.com/adminapp/...</code>, не голый корень. Это не ограничение Caddy, а сам coordinator: <code class=\"inline\">/app/</code>/<code class=\"inline\">/adminapp/</code> — фиксированный base путь, зашитый в сборку фронта (Vite <code class=\"inline\">base</code>), потому что корень <code class=\"inline\">/</code> зарезервирован под Public Game API (тот же процесс отвечает игровым клиентам). Убрать суффикс на выделенном домене — отдельная, не совсем тривиальная правка (либо роутинг по <code class=\"inline\">Host</code> в coordinator&#x27;е, либо Caddy <code class=\"inline\">handle_path</code> с переписыванием пути и отдельная сборка фронта под другой base). Нужно?</p>",
     "ts": "2026-07-08T13:47:33.542Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>Public Game API тоже будет на отдельном домене , так что нужен роутинг по Host</p>",
+    "ts": "2026-07-08T13:49:35.372Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тут два варианта. Рекомендую первый — он ничего не меняет в коде/сборке фронтов, работает с уже собранным образом.</p><p>**Вариант А (рекомендую) — роутинг по Host целиком на Caddy**, coordinator не в курсе разных доменов, просто отвечает на пути <code class=\"inline\">/app/</code>, <code class=\"inline\">/adminapp/</code>, <code class=\"inline\">/admin/</code>, <code class=\"inline\">/dashboard/</code>, <code class=\"inline\">/</code> как раньше. Caddy сам решает по имени хоста, куда что проксировать, и подставляет нужный префикс для корневых SPA-путей (чтобы <code class=\"inline\">admin.example.com/</code> снаружи выглядел чисто, а внутрь uходил как <code class=\"inline\">/adminapp/</code>):</p>",
+    "ts": "2026-07-08T13:51:25.459Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю compose и <code class=\"inline\">.env.example</code> под три домена.</p>",
+    "ts": "2026-07-08T13:51:50.243Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю живьём: реальный <code class=\"inline\">docker compose</code> + <code class=\"inline\">caddy</code> с тремя доменными блоками, что рерайты действительно работают правильно (без утечки двойного префикса).</p>",
+    "ts": "2026-07-08T13:52:22.694Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все шесть кейсов дали ровно ожидаемые пути — рерайты корректны, без двойного префикса и без порчи API-путей.</p>",
+    "ts": "2026-07-08T13:53:07.758Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю README.md под три домена.</p>",
+    "ts": "2026-07-08T13:53:16.579Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>- **<code class=\"inline\">Caddyfile</code>** — три доменных блока (<code class=\"inline\">API_DOMAIN</code>/<code class=\"inline\">APP_DOMAIN</code>/<code class=\"inline\">ADMIN_DOMAIN</code>), у <code class=\"inline\">app</code>/<code class=\"inline\">admin</code> — условный рерайт (<code class=\"inline\">rewrite @needsPrefix ...</code>), который добавляет <code class=\"inline\">/app</code>/<code class=\"inline\">/adminapp</code> только к путям, которые ещё не начинаются с него или с соответствующего API-префикса (<code class=\"inline\">/dashboard</code>, <code class=\"inline\">/admin</code>) — иначе рерайт задвоился бы.<br>- **<code class=\"inline\">docker-compose.yml</code>**/**<code class=\"inline\">.env.example</code>** — под три переменные вместо одной.<br>- **<code class=\"inline\">README.md</code>** — обновлены шаги 2/5/8/9, плюс явная оговорка: разделение по доменам сейчас косметическое (Caddy-уровень), не жёсткая изоляция на бэкенде — если понадобится настоящая (coordinator сам различает домены и не отвечает на чужом), это отдельная, более инвазивная задача (Host-based роутинг в Go + отдельная сборка фронтов с <code class=\"inline\">base: &#x27;/&#x27;</code>).</p><p>**Проверено живьём**: поднял Caddy с этим же рерайт-конфигом против тестового echo-сервера и curl&#x27;ом с разными <code class=\"inline\">Host</code>-заголовками — все шесть комбинаций (корень/статика/API на каждом домене) дали ровно ожидаемые пути, без задвоения префикса и без порчи API-путей.</p>",
+    "ts": "2026-07-08T13:54:01.498Z"
   }
 ]
