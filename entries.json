@@ -7985,5 +7985,17 @@
     "who": "claude",
     "html": "<p>Готово. Написал и живьём проверил (реальный <code class=\"inline\">docker compose up</code> с Postgres healthcheck + coordinator + локально собранным образом — postgres стал healthy, coordinator дождался, применил миграции, поднялся, <code class=\"inline\">/app/</code> отдал реальный HTML):</p><p>- **<code class=\"inline\">deploy/prod/docker-compose.yml</code>** — postgres + coordinator + caddy, без публикации портов Postgres/coordinator наружу (только caddy на 80/443)<br>- **<code class=\"inline\">deploy/prod/Caddyfile</code>** — авто-HTTPS на домен из <code class=\"inline\">.env</code><br>- **<code class=\"inline\">deploy/prod/.env.example</code>** — шаблон секретов с комментариями, что откуда брать<br>- **<code class=\"inline\">deploy/prod/README.md</code>** — пронумерованный чек-лист: дроплет → DNS → открыть приватный ghcr-образ → <code class=\"inline\">.env</code> → <code class=\"inline\">docker compose up</code> → <code class=\"inline\">create-admin</code> (одноразовый контейнер в той же сети, без открытия БД в интернет) → первый логин и провижининг кластера → проверка сквозного флоу → обновление</p><p>Всё это новые файлы, ничего существующего не тронуто (<code class=\"inline\">git status</code> показывает только <code class=\"inline\">deploy/prod/</code> как untracked).</p>",
     "ts": "2026-07-08T13:43:21.406Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>билды фронтов нужно будет в nginx конфиге прописывать и letsencrypt настраивать?</p>",
+    "ts": "2026-07-08T13:45:00.399Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нет, ни то ни другое руками делать не нужно — именно поэтому в compose стоит Caddy, а не nginx.</p><p>**Фронтовые билды**: они не раздаются отдельным веб-сервером вообще. <code class=\"inline\">dashboardui</code>/<code class=\"inline\">admindashboardui</code> собираются на этапе <code class=\"inline\">docker build</code> и запекаются прямо в образ coordinator&#x27;а (<code class=\"inline\">Dockerfile</code>, стадии <code class=\"inline\">ui</code>/<code class=\"inline\">adminui</code> → <code class=\"inline\">COPY --from=ui /ui/dist /app/dashboardui</code>) — сам Go-бинарь раздаёт их (<code class=\"inline\">internal/coordinator/spa.Handler</code>) под <code class=\"inline\">/app/</code> и <code class=\"inline\">/adminapp/</code>. Caddy просто проксирует **весь** трафик на <code class=\"inline\">coordinator:8080</code> одним <code class=\"inline\">reverse_proxy</code> без единого location-блока — ему не нужно знать про статику, роуты SPA, хэшированные ассеты и т.д., это всё уже решено на уровне coordinator&#x27;а.</p><p>**Let&#x27;s Encrypt**: Caddy получает и продлевает сертификат сам, полностью автоматически — единственное условие уже в <code class=\"inline\">Caddyfile</code>, который я написал: домен в <code class=\"inline\">.env</code> должен резолвиться A-записью на IP дроплета. Никакого <code class=\"inline\">certbot</code>, cron на renewal, ручного <code class=\"inline\">nginx -s reload</code> после обновления сертификата — Caddy делает это в фоне сам, без вмешательства.</p><p>Единственное, что нужно сделать руками, — прописать домен в <code class=\"inline\">.env</code> (шаг 5 README) и убедиться, что DNS уже настроен до <code class=\"inline\">docker compose up</code> (шаг 2) — иначе Caddy не сможет пройти ACME-challenge и зависнет на попытке выпустить сертификат.</p>",
+    "ts": "2026-07-08T13:45:18.705Z"
   }
 ]
