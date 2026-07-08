@@ -8087,5 +8087,53 @@
     "who": "claude",
     "html": "<p>Итог по твоему вопросу:</p><p>**Да, можно**, но с оговоркой: Let&#x27;s Encrypt так не заработает — ACME-серверы резолвят домен со своих серверов, а не через твой локальный <code class=\"inline\">/etc/hosts</code>, так что для локальной проверки нужно временно убрать <code class=\"inline\">https://</code>-часть (просто протестировать по голому HTTP тем же <code class=\"inline\">Caddyfile</code>).</p><p>Я проверил именно так — полным стеком (Postgres + реальный собранный образ coordinator&#x27;а + Caddy), подставив домены через <code class=\"inline\">curl --resolve</code> (безопаснее правки <code class=\"inline\">/etc/hosts</code> — не трогает системный файл, работает только для конкретного запроса). Все три домена отработали правильно на реальном бэкенде: <code class=\"inline\">app.local.test/</code> → indie dashboard, <code class=\"inline\">admin.local.test/</code> → admin dashboard, API-пути не задвоились.</p><p>Если хочешь именно через браузер (не curl) — та же идея: допиши три строки в <code class=\"inline\">/etc/hosts</code> (<code class=\"inline\">127.0.0.1 api.test app.test admin.test</code>, нужны права root на правку файла), временно замени в <code class=\"inline\">Caddyfile</code> <code class=\"inline\">{$API_DOMAIN} {</code> на <code class=\"inline\">http://{$API_DOMAIN} {</code> (и так для всех трёх — Caddy тогда не будет пытаться получить сертификат), подними <code class=\"inline\">docker compose up -d</code> и открой <code class=\"inline\">http://app.test/</code> и <code class=\"inline\">http://admin.test/</code> — не забудь потом вернуть <code class=\"inline\">Caddyfile</code> обратно перед реальным деплоем.</p>",
     "ts": "2026-07-08T13:58:13.323Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделай команду для локального запуска в режиме прод с тестовыми доменами</p>",
+    "ts": "2026-07-08T13:58:52.009Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оформляю это как переиспользуемую команду: <code class=\"inline\">Caddyfile.local</code> (без TLS) + отдельный <code class=\"inline\">docker-compose.local.yml</code> (сборка из исходников, не тянет <code class=\"inline\">ghcr.io</code>) + скрипты + <code class=\"inline\">make</code>-таргеты.</p>",
+    "ts": "2026-07-08T14:00:09.694Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю <code class=\"inline\">make</code>-таргеты.</p>",
+    "ts": "2026-07-08T14:01:11.785Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь живьём проверяю саму команду от начала до конца.</p>",
+    "ts": "2026-07-08T14:01:27.577Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Команда полностью автоматизировала сборку и подъём. Проверяю сами домены.</p>",
+    "ts": "2026-07-08T14:02:08.335Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё совпадает с ожидаемым. Гашу командой <code class=\"inline\">down</code>.</p>",
+    "ts": "2026-07-08T14:02:23.079Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто гасится. Прибираю тестовый образ и <code class=\"inline\">.env.local</code>, сгенерированный за проверку.</p>",
+    "ts": "2026-07-08T14:02:32.567Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. <code class=\"inline\">make prod-local-up</code> / <code class=\"inline\">make prod-local-down</code> — живьём проверено от нуля до чистого удаления:</p><p>- **<code class=\"inline\">deploy/prod/docker-compose.local.yml</code>** — самодостаточный (не override) стек: Postgres + coordinator (собирается из исходников, не тянет <code class=\"inline\">ghcr.io</code>) + Caddy на портах <code class=\"inline\">8880</code>/<code class=\"inline\">8443</code> (чтобы не конфликтовать с занятым 80-м на машине разработчика)<br>- **<code class=\"inline\">deploy/prod/Caddyfile.local</code>** — та же рерайт-логика, что в прод-<code class=\"inline\">Caddyfile</code>, но голый HTTP (Let&#x27;s Encrypt не выпустит сертификат тестовым доменам)<br>- **<code class=\"inline\">deploy/prod/test-local-up.sh</code>** — генерирует <code class=\"inline\">deploy/prod/.env.local</code> (тестовые домены <code class=\"inline\">*.local.test</code>, случайный ключ шифрования) при первом запуске, поднимает стек, печатает готовые команды <code class=\"inline\">curl --resolve</code> и подсказку про <code class=\"inline\">/etc/hosts</code><br>- **<code class=\"inline\">deploy/prod/test-local-down.sh</code>** — гасит и сносит<br>- <code class=\"inline\">Makefile</code> — таргеты <code class=\"inline\">prod-local-up</code>/<code class=\"inline\">prod-local-down</code><br>- <code class=\"inline\">.gitignore</code> — добавлен <code class=\"inline\">deploy/prod/.env.local</code></p>",
+    "ts": "2026-07-08T14:02:47.056Z"
   }
 ]
