@@ -5987,5 +5987,53 @@
     "who": "claude",
     "html": "<p>## Готово</p><p>Реализован динамический CRUD кластеров для админа (этап 1 из плана):</p><p>**Бэкенд** (<code class=\"inline\">internal/coordinator/provisioning</code>):<br>- <code class=\"inline\">CloudProvisioner</code> расширен методами <code class=\"inline\">DeleteCluster</code>/<code class=\"inline\">ListRegions</code>, реализованными в <code class=\"inline\">DOAdapter</code>/<code class=\"inline\">VultrAdapter</code> (реальные API DO/Vultr) и в новом <code class=\"inline\">KindAdapter</code> — третьем &quot;облаке&quot; только для локальной разработки (фиксированные регионы <code class=\"inline\">eu</code>/<code class=\"inline\">us</code>/<code class=\"inline\">asia</code>, создаёт/удаляет настоящий kind-кластер, метит ноды под дефолтный тариф).<br>- <code class=\"inline\">Manager.Deprovision</code> — реальный teardown с двумя барьерами: кластер должен быть <code class=\"inline\">draining</code>, и ни один <code class=\"inline\">game_regions</code> не должен на него ссылаться (иначе 409).<br>- Новый терминальный статус <code class=\"inline\">cluster_registry.status = &#x27;deleted&#x27;</code> (миграция 000030), новые ручки <code class=\"inline\">DELETE /clusters/{id}</code> и <code class=\"inline\">GET /clouds</code>.</p><p>**Admin UI**: форма provision — теперь настоящие <code class=\"inline\">&lt;select&gt;</code> для облака/региона (вместо свободного текста), кнопка **Delete…** на карточке кластера (активна только при <code class=\"inline\">draining</code>, confirm подчёркивает необратимость).</p><p>**Проверено**:<br>- <code class=\"inline\">make test</code> — весь Go-набор зелёный (включая новые юнит-тесты <code class=\"inline\">provisioning</code>/<code class=\"inline\">admindashboard</code> против реального Postgres).<br>- 15/15 vitest в <code class=\"inline\">admindashboardui</code> + чистый <code class=\"inline\">tsc</code>.<br>- Живьём через <code class=\"inline\">make dev-stack</code>: создан настоящий kind-кластер <code class=\"inline\">coordinator-eu</code> (job → <code class=\"inline\">ready</code>, Agones поднялся), <code class=\"inline\">DELETE</code> без drain честно отбит 409, после drain — снесён, <code class=\"inline\">cluster_registry.status = deleted</code>. Побутно нашёл и починил стоящую отдельно проблему: in-cluster образ coordinator&#x27;а был на 3 дня старее новой миграции и упал при возврате реплики — пересобрал образ, деплоймент снова здоров.</p><p>Документация (<code class=\"inline\">PROJECT_MAP.md</code>, <code class=\"inline\">ADMIN_UI_MAP.md</code>, <code class=\"inline\">CLAUDE.md</code>, <code class=\"inline\">WHATIF.md</code>) обновлена по всем пунктам.</p><p>Что осознанно осталось за скобками (этап 2, по твоему выбору): node pool с разными &quot;планами&quot;/тарифами внутри одного кластера — сейчас один универсальный pool на кластер, как и раньше у DO/Vultr.</p>",
     "ts": "2026-07-08T09:39:37.615Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделай команду в makefile для живого прогона тестом для crud кластеров</p>",
+    "ts": "2026-07-08T09:40:09.693Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю цель в Makefile рядом с другими <code class=\"inline\">test-e2e-*</code>.</p>",
+    "ts": "2026-07-08T09:41:23.229Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь реально прогоняю новую цель, чтобы убедиться, что она рабочая.</p>",
+    "ts": "2026-07-08T09:41:44.325Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">make test-e2e-provisioning</code> реально прошёл (78с): создал настоящий kind-кластер, проверил лейбл ноды и Agones, подтвердил барьер drain-first, удалил кластер. Проверяю, что kind-кластер и вправду не остался висеть.</p>",
+    "ts": "2026-07-08T09:43:15.615Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто, <code class=\"inline\">coordinator-e2e</code> не остался. Обновляю документацию — добавляю команду в CLAUDE.md рядом с другими <code class=\"inline\">test-e2e-*</code>.</p>",
+    "ts": "2026-07-08T09:43:19.157Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю ссылку в PROJECT_MAP.md на новую воспроизводимую тестовую цель.</p>",
+    "ts": "2026-07-08T09:43:41.002Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальная проверка, что обычный прогон тестов не задет новым файлом.</p>",
+    "ts": "2026-07-08T09:43:58.930Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово.</p><p>**Что добавлено**: <code class=\"inline\">make test-e2e-provisioning</code> — живой e2e-тест CRUD кластеров (<code class=\"inline\">internal/coordinator/provisioning/e2e_test.go</code>, тег <code class=\"inline\">e2e</code>):<br>- сам поднимает одноразовый kind-кластер через <code class=\"inline\">KindAdapter</code> (не нужен предварительно поднятый <code class=\"inline\">coordinator-dev</code>, в отличие от <code class=\"inline\">test-e2e-builds</code>);<br>- доводит provisioning-job до <code class=\"inline\">ready</code>, реальным <code class=\"inline\">kubectl</code> проверяет лейбл ноды <code class=\"inline\">coordinator.dev/tariff=free</code> и что Agones controller поднят;<br>- проверяет барьер «нельзя удалить без drain» (<code class=\"inline\">must_drain_first</code>);<br>- drain → delete → убеждается, что kind-кластер физически исчез и статус в БД — <code class=\"inline\">deleted</code>;<br>- <code class=\"inline\">t.Cleanup</code> сносит кластер даже при упавшем тесте.</p><p>Реально прогнал: <code class=\"inline\">make test-e2e-provisioning</code> — **PASS за ~78с**, после прогона <code class=\"inline\">kind get clusters</code> кластер не показывает. <code class=\"inline\">make test-short</code> — обычный прогон не задет (файл собирается только с <code class=\"inline\">-tags e2e</code>).</p><p>Задокументировал в <code class=\"inline\">CLAUDE.md</code> (список команд) и <code class=\"inline\">PROJECT_MAP.md</code> (п.6, KindAdapter).</p>",
+    "ts": "2026-07-08T09:44:10.672Z"
   }
 ]
