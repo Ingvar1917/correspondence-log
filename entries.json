@@ -6059,5 +6059,107 @@
     "who": "claude",
     "html": "<p>Две причины, и обе конкретные, не «на всякий случай».</p><p>**1. Физически нельзя — упрётся в foreign key.**</p><p>Смотри на реальные ссылки на <code class=\"inline\">cluster_registry(id)</code>, ни у одной нет <code class=\"inline\">ON DELETE CASCADE</code>:</p><pre><code>\ngame_regions.cluster_id            REFERENCES cluster_registry(id)\nsessions.cluster_id                REFERENCES cluster_registry(id)\ngameserver_metrics.cluster_id      NOT NULL REFERENCES cluster_registry(id)\nincidents.cluster_id               NOT NULL REFERENCES cluster_registry(id)\ncluster_provisioning_jobs.cluster_id  REFERENCES cluster_registry(id)\n</code></pre><p><code class=\"inline\">gameserver_metrics</code>/<code class=\"inline\">incidents</code> — это исторические строки: метрики CPU/RAM и инциденты (краши/причины остановки), которые собирались, пока кластер жил. Они **<code class=\"inline\">NOT NULL</code>**, без каскада. Если попытаться <code class=\"inline\">DELETE FROM cluster_registry WHERE id = ...</code>, Postgres честно откажет с ошибкой foreign key violation, как только у этого кластера накопилась хоть одна строка метрик или инцидентов — а метрики пишутся каждые <code class=\"inline\">METRICS_COLLECT_INTERVAL</code> (по умолчанию 30с) для любого живого кластера. То есть hard-delete был бы возможен только для кластера, который вообще ни разу не пожил ни секунды — на практике бесполезное ограничение.</p><p>**2. Даже если бы получилось — это стёрло бы историю, которая должна остаться читаемой.**</p><p>Если бы у миграций были каскады (снести <code class=\"inline\">game_regions</code>/<code class=\"inline\">sessions</code>/<code class=\"inline\">gameserver_metrics</code>/<code class=\"inline\">incidents</code> вместе со строкой кластера), это уничтожило бы:<br>- историю метрик по этому кластеру (график CPU/RAM за прошлое — зачем он был нужен, если данные исчезнут вместе с самим кластером),<br>- записи об инцидентах (краши игровых серверов) — это данные для расследования проблем, не должны пропадать просто потому, что кластер потом снесли,<br>- <code class=\"inline\">cluster_provisioning_jobs</code> — аудит &quot;кто/когда создал этот кластер и через какую job&quot;.</p><p>Всё это — данные о прошлом, которые не становятся неверными от того, что кластер физически исчез сейчас. Стирать их вместе с кластером означало бы терять аудит-трейл.</p><p>Поэтому решение то же, что уже применяется для <code class=\"inline\">draining</code>: не трогать строку, а флагом (<code class=\"inline\">status</code>) вывести её из ротации. <code class=\"inline\">deleted</code> — просто необратимая версия того же приёма: <code class=\"inline\">ListActiveByRegion</code>/<code class=\"inline\">ListAllActive</code> фильтруют <code class=\"inline\">WHERE status = &#x27;active&#x27;</code>, так что <code class=\"inline\">deleted</code>-кластер так же не участвует в роутинге, как и <code class=\"inline\">draining</code>, только уже навсегда — а <code class=\"inline\">GET /clusters</code> (админский обзор) продолжает его показывать, потому что это честная история &quot;что здесь было&quot;.</p>",
     "ts": "2026-07-08T09:51:49.483Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>Хочешь, чтобы я закрыл это сейчас — сделал deleted настоящим терминальным статусом<br>сделай</p>",
+    "ts": "2026-07-08T09:52:42.990Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Начинаю с бэкенда: делаю <code class=\"inline\">deleted</code> настоящим терминальным статусом на уровне репозитория.</p>",
+    "ts": "2026-07-08T09:53:25.821Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сам <code class=\"inline\">SetStatus</code>:</p>",
+    "ts": "2026-07-08T09:53:38.021Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">Manager.Deprovision</code> — отдельная, более точная ошибка для уже удалённого кластера.</p>",
+    "ts": "2026-07-08T09:53:50.017Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сама проверка в <code class=\"inline\">Manager.Deprovision</code>:</p>",
+    "ts": "2026-07-08T09:54:03.853Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь маппинг новых ошибок в <code class=\"inline\">admindashboard/errors.go</code>:</p>",
+    "ts": "2026-07-08T09:54:16.172Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь обновляю фронт — скрываю Drain/Undrain/Delete для <code class=\"inline\">deleted</code>-кластеров.</p>",
+    "ts": "2026-07-08T09:54:35.410Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю новый ключ i18n <code class=\"inline\">clusters.deletedHint</code>:</p>",
+    "ts": "2026-07-08T09:55:01.517Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тесты. Сначала <code class=\"inline\">clusterregistry</code>:</p>",
+    "ts": "2026-07-08T09:55:14.491Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">provisioning/manager_test.go</code> — тест на <code class=\"inline\">ErrAlreadyDeleted</code>:</p>",
+    "ts": "2026-07-08T09:55:29.889Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">admindashboard/handlers_test.go</code>:</p>",
+    "ts": "2026-07-08T09:55:45.564Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь запускаю бэкенд-тесты этих трёх пакетов.</p>",
+    "ts": "2026-07-08T09:56:10.908Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все зелёные. Теперь фронтовый тест на скрытие кнопок у <code class=\"inline\">deleted</code>-кластера.</p>",
+    "ts": "2026-07-08T09:56:24.094Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все тесты зелёные. Прогоняю полный набор Go-тестов и обновляю документацию.</p>",
+    "ts": "2026-07-08T09:56:54.112Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю WHATIF.md — дополняю строку про удаление кластера тем, что теперь <code class=\"inline\">deleted</code> реально терминален.</p>",
+    "ts": "2026-07-08T09:57:01.687Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю <code class=\"inline\">ADMIN_UI_MAP.md</code> и <code class=\"inline\">PROJECT_MAP.md</code> кратким упоминанием фикса.</p>",
+    "ts": "2026-07-08T09:57:31.083Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Готово — <code class=\"inline\">deleted</code> теперь настоящий терминальный статус:</p><p>**Бэкенд:**<br>- <code class=\"inline\">clusterregistry.Repository.SetStatus</code> больше не голый <code class=\"inline\">UPDATE</code> — отбивает любой переход *из* <code class=\"inline\">deleted</code> (<code class=\"inline\">ErrClusterDeleted</code>).<br>- <code class=\"inline\">Manager.Deprovision</code> отдельно ловит «уже удалён» (<code class=\"inline\">ErrAlreadyDeleted</code>), не путая с «сначала drain» (<code class=\"inline\">ErrMustDrainFirst</code>) — разные причины, разные сообщения.<br>- <code class=\"inline\">admindashboard/errors.go</code>: обе новые ошибки → 409 <code class=\"inline\">cluster_deleted</code>.</p><p>**Admin UI:** для <code class=\"inline\">status=deleted</code> весь блок Drain/Undrain/Delete не рендерится — вместо кнопок статичная подпись «deleted — no actions left».</p><p>**Тесты** (все прогнаны, зелёные): <code class=\"inline\">TestSetStatus_DeletedClusterIsTerminal</code>, <code class=\"inline\">TestDeprovision_AlreadyDeletedReturnsDistinctError</code>, <code class=\"inline\">TestDrainUndrainCluster_DeletedClusterIsTerminal</code>, <code class=\"inline\">TestDeleteCluster_PropagatesAlreadyDeleted</code>, плюс фронтовый тест на отсутствие кнопок.</p><p>Документация (<code class=\"inline\">WHATIF.md</code>, <code class=\"inline\">ADMIN_UI_MAP.md</code>) обновлена — новая строка описывает, что было и как исправлено. Не закоммичено — оставляю тебе, как обычно.</p>",
+    "ts": "2026-07-08T09:58:05.678Z"
   }
 ]
