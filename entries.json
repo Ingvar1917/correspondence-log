@@ -7553,5 +7553,17 @@
     "who": "claude",
     "html": "<p>Готово. Итог:</p><p>**Причина ошибки** — сирота-кластер <code class=\"inline\">coordinator-asia</code>: физический kind-кластер существовал (от неудачной прошлой попытки провижининга), а строки в БД для него не было. Копнув глубже, нашёл ещё один связанный баг: <code class=\"inline\">coordinator-eu</code> был физически жив с Agones, но в БД висел терминальным <code class=\"inline\">deleted</code> — маршрутизация его не видела.</p><p>**Корень обоих** — <code class=\"inline\">Manager.Launch</code> называет kind-кластер детерминированно (<code class=\"inline\">&quot;coordinator-&quot;+region</code>), а <code class=\"inline\">EnsureRegistered</code> (апсерт при завершении провижининга) не сбрасывает <code class=\"inline\">status</code> при конфликте — это поведение было правильным для bootstrap-кластера при рестарте coordinator&#x27;а, но неверным для динамического CRUD.</p><p>**Фикс** (оба файла): <code class=\"inline\">KindAdapter.CreateCluster</code> теперь self-healing — при «already exist» считает кластер сиротой, сносит и пересоздаёт один раз; новый <code class=\"inline\">clusterregistry.EnsureRegisteredActive</code> (используется только из <code class=\"inline\">Manager.finish</code>) оживляет <code class=\"inline\">status</code> в <code class=\"inline\">active</code> при конфликте, не трогая bootstrap-путь.</p><p>**Проверено**: юнит-тесты (<code class=\"inline\">TestEnsureRegistered_PreservesStatusOnConflict</code>, <code class=\"inline\">TestEnsureRegisteredActive_RevivesDeletedStatusOnConflict</code>) + живьём через реальный Admin API — оба сироты (<code class=\"inline\">asia</code> и <code class=\"inline\">eu</code>) переприжинены без ошибок, оба теперь <code class=\"inline\">active</code> в <code class=\"inline\">GET /admin/clusters</code>. <code class=\"inline\">go build</code>/<code class=\"inline\">make test-short</code> зелёные. Запись с полным разбором и доказательствами — в WHATIF.md.</p>",
     "ts": "2026-07-08T12:33:13.231Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>как создать админа после make clean-all&amp;</p>",
+    "ts": "2026-07-08T12:39:21.499Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>После <code class=\"inline\">make clean-all</code> кластер и данные снесены, поэтому сначала нужно поднять стенд заново, потом создать админа против его Postgres:</p><pre><code>make dev-up   # пересоздаёт kind-кластер + Postgres + миграции, localhost:5432 доступен напрямую (hostPort в kind-cluster.yaml)\n\n# .env (gitignored) уже содержит POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB\nset -a; source .env; set +a\nDATABASE_URL=&quot;postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5432/$POSTGRES_DB?sslmode=disable&quot; \\\n  go run ./cmd/create-admin -email admin@example.com -password yourpassword123\n</code></pre><p>Если ещё и <code class=\"inline\">make dev-stack</code> (для локального бинаря + UI), Postgres тот же самый — команда <code class=\"inline\">create-admin</code> та же, порядок неважен, главное чтобы <code class=\"inline\">dev-up</code> уже отработал (миграции применены).</p><p><code class=\"inline\">cmd/create-admin</code> — единственный способ завести админа (сознательно нет HTTP-регистрации, см. комментарий в <code class=\"inline\">cmd/create-admin/main.go</code>), гоняется напрямую против <code class=\"inline\">DATABASE_URL</code>, ничего в Makefile под это не заведено.</p>",
+    "ts": "2026-07-08T12:40:15.433Z"
   }
 ]
