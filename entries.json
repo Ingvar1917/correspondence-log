@@ -7013,5 +7013,401 @@
     "who": "claude",
     "html": "<p>Имел в виду: не заводить это отдельным мини-проектом с планом/этапами (как было с Units), а просто расширить то, что уже есть — сейчас <code class=\"inline\">presets</code> это одна таблица (<code class=\"inline\">internal/coordinator/presets/repository.go:46</code> + её migration), один <code class=\"inline\">Repository</code>, один admin CRUD-хендлер, один <code class=\"inline\">PresetPicker</code> в indie UI.</p><p>«Добавить прямо в схему» = один маленький migration с двумя колонками в существующую таблицу <code class=\"inline\">presets</code>:<br>\u0000FENCE0\u0000<br>— плюс два поля в <code class=\"inline\">Preset</code>-структуре, <code class=\"inline\">admin*Request</code>/<code class=\"inline\">*View</code> DTO, и вывод в существующей карточке <code class=\"inline\">PresetPicker</code> — без нового пакета, без нового плана, без разбивки на этапы. Это отличается от подхода Units/CRUD-кластеров тем, что там появлялись новые таблицы/пакеты/инвариантные решения (тариф vs RAM, circuit breaker) — здесь новых сущностей нет, просто два атрибута на уже существующей.</p><p>Против: если тебе нужно продумать что-то нетривиальное сверху (например, автоматическую валидацию repo_url, или разные наборы полей для разных движков) — тогда это перестаёт быть «просто колонка» и стоит написать план. Но по твоему описанию похоже, что это именно этот случай — маленькое расширение, не новая подсистема.</p>",
     "ts": "2026-07-08T11:40:53.846Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>да, для создания пресетов будет отдельный проект, а загружать нужно в admin UI</p>",
+    "ts": "2026-07-08T11:42:08.225Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь смотрю indie-сторону (dashboardapi presets endpoint) и admin UI форму.</p>",
+    "ts": "2026-07-08T11:42:41.553Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Смотрю на масштаб: у admin-стороны вообще нет UI для пресетов (только API) и нет инфраструктуры chunked-аплоада (она есть только в indie <code class=\"inline\">dashboardui/src/lib/upload.ts</code>). Это не «две колонки», а полноценная фича — админская страница пресетов с нуля. Прежде чем писать код на несколько пакетов и оба UI, оформлю план.</p>",
+    "ts": "2026-07-08T11:43:32.855Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, есть полная картина. Пишу план.</p>",
+    "ts": "2026-07-08T11:45:19.145Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это другая, уже реализованная задача — перезаписываю целиком.</p>",
+    "ts": "2026-07-08T11:46:06.686Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Начинаю с миграции.</p>",
+    "ts": "2026-07-08T11:47:58.069Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">presets/repository.go</code>.</p>",
+    "ts": "2026-07-08T11:48:12.714Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Упрощаю — <code class=\"inline\">repo_url</code> как plain <code class=\"inline\">TEXT NOT NULL DEFAULT &#x27;&#x27;</code>, по образцу уже существующего <code class=\"inline\">description</code>, вместо nullable (иначе COALESCE не даёт различить «не трогали» и «очистили»).</p>",
+    "ts": "2026-07-08T11:48:56.961Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">presets/service.go</code> — валидация engine, macOS в OS-проверке.</p>",
+    "ts": "2026-07-08T11:49:17.577Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Good. Обновляю todos и переключаюсь на todo 3→4 (уже сделано), теперь admindashboard.</p>",
+    "ts": "2026-07-08T11:50:01.666Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, это Service — валидация уже подключена. Теперь indie-сторона <code class=\"inline\">dashboardapi/presets.go</code>.</p>",
+    "ts": "2026-07-08T11:50:45.954Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба backend-слоя готовы, компилирую сразу для быстрой обратной связи.</p>",
+    "ts": "2026-07-08T11:51:08.733Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Обновляю todos и пишу Go-тесты.</p>",
+    "ts": "2026-07-08T11:51:16.595Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чтобы не ломать обратную совместимость (существующие тесты и вызовы без <code class=\"inline\">Engine</code>), делаю его опциональным на уровне сервиса — пустая строка трактуется как <code class=\"inline\">other</code>, зеркалируя DB <code class=\"inline\">DEFAULT &#x27;other&#x27;</code>.</p>",
+    "ts": "2026-07-08T11:51:50.044Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь проверяю компиляцию и существующие тесты пресетов.</p>",
+    "ts": "2026-07-08T11:52:17.911Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется чисто. Теперь добавляю Go-тесты для нового поведения.</p>",
+    "ts": "2026-07-08T11:52:25.334Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю macOS в тест клиентских артефактов.</p>",
+    "ts": "2026-07-08T11:52:35.573Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">presets/service_test.go</code>.</p>",
+    "ts": "2026-07-08T11:52:44.073Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тесты валидации engine/repoURL.</p>",
+    "ts": "2026-07-08T11:52:57.384Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Запускаю тесты пакета <code class=\"inline\">presets</code>.</p>",
+    "ts": "2026-07-08T11:53:10.187Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All green. Теперь тесты <code class=\"inline\">admindashboard</code>/<code class=\"inline\">dashboardapi</code> presets.</p>",
+    "ts": "2026-07-08T11:53:24.665Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь исправляю тест <code class=\"inline\">TestInitClientUpload_RejectsInvalidOS</code> (macos больше не невалиден) и добавляю позитивный macOS-тест.</p>",
+    "ts": "2026-07-08T11:53:48.482Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">dashboardapi/presets_test.go</code>.</p>",
+    "ts": "2026-07-08T11:53:58.956Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю проверку engine/repo_url в существующий тест списка.</p>",
+    "ts": "2026-07-08T11:54:16.539Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь запускаю оба пакета тестов.</p>",
+    "ts": "2026-07-08T11:54:23.094Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нужно добавить новые ошибки в маппинг обеих пакетов errors.go (admindashboard и dashboardapi).</p>",
+    "ts": "2026-07-08T11:54:45.504Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Есть тот же список, добавляю для консистентности, хотя indie не создаёт/не редактирует пресеты.</p>",
+    "ts": "2026-07-08T11:55:02.006Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все Go-тесты зелёные. Отмечаю и перехожу к фронтенду.</p>",
+    "ts": "2026-07-08T11:55:34.466Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, всё как ожидалось. Пишу <code class=\"inline\">admindashboardui/src/lib/upload.ts</code>.</p>",
+    "ts": "2026-07-08T11:56:28.125Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю недостающие i18n-ключи (<code class=\"inline\">validation.*</code>, <code class=\"inline\">upload.*</code>) в admin en.ts, плюс большой блок <code class=\"inline\">presets.*</code>.</p>",
+    "ts": "2026-07-08T11:56:42.255Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю <code class=\"inline\">nav.presets</code> и блок <code class=\"inline\">presets.*</code>.</p>",
+    "ts": "2026-07-08T11:56:49.234Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю типы Preset в конец файла.</p>",
+    "ts": "2026-07-08T11:57:19.119Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь роутинг и навигация в <code class=\"inline\">App.tsx</code>.</p>",
+    "ts": "2026-07-08T11:57:27.057Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Поправляю: <code class=\"inline\">engineLabel</code> вычислялся один раз на уровне модуля через <code class=\"inline\">t()</code> — если язык переключится, подписи не обновятся. Делаю функцией, вызываемой при рендере.</p>",
+    "ts": "2026-07-08T11:58:36.533Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Обновляю todos и пишу тесты для <code class=\"inline\">PresetsPage</code>.</p>",
+    "ts": "2026-07-08T11:59:19.620Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю импорт и блок тестов для <code class=\"inline\">PresetsPage</code>.</p>",
+    "ts": "2026-07-08T12:00:31.837Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Фикс: GET-хендлер должен отражать состояние после complete, иначе invalidate вернёт старые данные.</p>",
+    "ts": "2026-07-08T12:01:07.472Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Есть коллизия меток кнопок: <code class=\"inline\">presets.deleteClient</code> тоже &quot;Delete…&quot; — как и удаление всего пресета. Переименовываю, чтобы не путать в тестах (та же грабля, что была с &quot;Save&quot; в TariffSection).</p>",
+    "ts": "2026-07-08T12:01:30.819Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь запускаю тесты фронта admindashboardui.</p>",
+    "ts": "2026-07-08T12:01:43.145Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 23 теста прошли. Обновляю todos и перехожу к indie UI.</p>",
+    "ts": "2026-07-08T12:02:15.661Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">PresetPicker.tsx</code> — добавляю macOS и отображение engine/repo_url.</p>",
+    "ts": "2026-07-08T12:02:40.714Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь редактирую <code class=\"inline\">PresetPicker.tsx</code>.</p>",
+    "ts": "2026-07-08T12:03:02.169Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю отображение engine-пилюли и ссылки на репозиторий на карточке.</p>",
+    "ts": "2026-07-08T12:03:21.105Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь ищу тесты для <code class=\"inline\">PresetPicker</code>/<code class=\"inline\">PresetsPage</code> в indie UI, чтобы обновить их под новые поля.</p>",
+    "ts": "2026-07-08T12:03:27.662Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All existing tests still pass. Теперь добавляю тест для macOS-кнопки и engine/repo_url в <code class=\"inline\">PresetsPage.test.tsx</code>.</p>",
+    "ts": "2026-07-08T12:04:02.475Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь запускаю полный набор тестов indie UI.</p>",
+    "ts": "2026-07-08T12:04:26.540Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все тесты обоих UI зелёные. Обновляю todos и перехожу к документации.</p>",
+    "ts": "2026-07-08T12:04:37.937Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю раздел 11 в PROJECT_MAP.md.</p>",
+    "ts": "2026-07-08T12:04:49.730Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю эти два блока — они устарели относительно текущей реализации.</p>",
+    "ts": "2026-07-08T12:05:18.075Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь ADMIN_UI_MAP.md — добавляю страницу <code class=\"inline\">/presets</code>, ключ кэша, пункты в чек-листе.</p>",
+    "ts": "2026-07-08T12:05:42.494Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь INDIE_UI_MAP.md.</p>",
+    "ts": "2026-07-08T12:06:35.610Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Теперь полный прогон <code class=\"inline\">make test</code> (с testcontainers) и <code class=\"inline\">make test-ui</code>.</p>",
+    "ts": "2026-07-08T12:07:14.128Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">db</code> package (migration test, включая новую 000033) прошёл на реальном Postgres. Теперь <code class=\"inline\">make test-ui</code>.</p>",
+    "ts": "2026-07-08T12:07:35.666Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">make dev-stack</code> уже запущен в твоём терминале (с 13:24, до всех этих правок) — бинарь и миграции у него старые. Чтобы прогнать живую проверку (создать пресет в Admin UI, залить архивы, проверить macOS-кнопку у индюка), нужно его перезапустить, чтобы подхватить новый код/миграцию.</p>",
+    "ts": "2026-07-08T12:08:09.676Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Останавливаю миграцию к текущей БД (перезапуск подхватит новую 000033) и поднимаю dev-stack заново в фоне.</p>",
+    "ts": "2026-07-08T12:08:31.383Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Поднялся с миграциями. Теперь создаю админ-аккаунт (если нужно) и логинюсь, чтобы прогнать живую проверку через API.</p>",
+    "ts": "2026-07-08T12:08:53.297Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Логинюсь и создаю живой пресет с engine/repo_url через реальный HTTP API.</p>",
+    "ts": "2026-07-08T12:09:23.725Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Пресет создан с engine/repo_url. Теперь заливаю серверный архив и три клиентских артефакта (включая macOS).</p>",
+    "ts": "2026-07-08T12:10:13.272Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Серверный архив реально загрузился и распознан как tar.gz. Теперь три клиентских артефакта, включая macOS.</p>",
+    "ts": "2026-07-08T12:10:31.456Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все три ОС загружены, включая macOS. Проверяю строку в БД и вид со стороны индюка.</p>",
+    "ts": "2026-07-08T12:10:42.355Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>БД корректна. Теперь проверяю, что индюковский <code class=\"inline\">GET /presets</code> видит новые поля.</p>",
+    "ts": "2026-07-08T12:10:49.832Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Индюковский API отдаёт <code class=\"inline\">engine</code>, <code class=\"inline\">repo_url</code> и все три ОС включая <code class=\"inline\">macos</code>. Проверяю скачивание macOS-клиента и стандартный флоу &quot;use as server build&quot;.</p>",
+    "ts": "2026-07-08T12:10:57.306Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Presigned-ссылка на macOS-клиент реально работает. Скачиваю файл, чтобы убедиться, что это тот же байт-контент.</p>",
+    "ts": "2026-07-08T12:11:04.475Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Байт в байт совпадает. Полный живой цикл подтверждён. Прибираю за собой временные файлы и port-forward.</p>",
+    "ts": "2026-07-08T12:11:11.847Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё почищено. Отмечаю финальную задачу выполненной.</p>",
+    "ts": "2026-07-08T12:11:23.418Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>**Бэкенд** (<code class=\"inline\">presets</code>, <code class=\"inline\">admindashboard</code>, <code class=\"inline\">dashboardapi</code>): миграция 000033 добавила <code class=\"inline\">presets.engine</code> (unity/unreal/godot/other) и <code class=\"inline\">presets.repo_url</code>, плюс macOS в <code class=\"inline\">preset_client_artifacts.os</code> CHECK. Валидация на сервисном уровне, engine опционален (пусто → <code class=\"inline\">other</code>, чтобы не сломать старые вызовы).</p><p>**Admin UI**: новая страница <code class=\"inline\">/presets</code> — создание, инлайн-редактирование, аплоад серверного архива и трёх клиентских артефактов (Windows/Linux/macOS) с прогресс-баром, delete с confirm. Новый параметризованный <code class=\"inline\">admindashboardui/src/lib/upload.ts</code> (порт индюкового аплоада — presets бьёт по нескольким upload-эндпоинтам).</p><p>**Indie UI**: <code class=\"inline\">PresetPicker</code> теперь показывает engine-пилюлю, ссылку на репозиторий и кнопку скачивания macOS-клиента.</p><p>**Проверено**: <code class=\"inline\">go build</code>/<code class=\"inline\">make test</code> (реальный Postgres, включая тест миграций) — зелено; <code class=\"inline\">make test-ui</code> (оба UI, 74+23 теста) — зелено; живой прогон через <code class=\"inline\">make dev-stack</code> — создал пресет через реальный admin API с engine/repo_url, залил серверный архив и все три клиентских артефакта, сверил строку в БД, убедился что indie <code class=\"inline\">GET /presets</code> отдаёт новые поля и macOS в списке, скачал macOS-клиент по presigned URL — байт в байт совпадает с загруженным.</p><p>Документация (<code class=\"inline\">PROJECT_MAP.md</code>, <code class=\"inline\">ADMIN_UI_MAP.md</code>, <code class=\"inline\">INDIE_UI_MAP.md</code>) обновлена.</p>",
+    "ts": "2026-07-08T12:11:39.187Z"
   }
 ]
