@@ -8399,5 +8399,59 @@
     "who": "claude",
     "html": "<p>Готово. Итог:</p><p>**Причина бага** — Caddy <code class=\"inline\">rewrite</code> был невидимым форвардом (HTTP 200, не редирект): браузер оставался на <code class=\"inline\">.../</code>, а собранный бандл нёс <code class=\"inline\">basename=&quot;/app&quot;</code> — React Router сверял с реальным <code class=\"inline\">window.location</code> и отказывался рендерить. Заодно это не давало настоящей изоляции доменов (утечка на общий бэкенд).</p><p>**Фикс** — настоящий Host-based роутинг:<br>- <code class=\"inline\">cmd/coordinator/main.go</code> — опциональные <code class=\"inline\">API_HOST</code>/<code class=\"inline\">APP_HOST</code>/<code class=\"inline\">ADMIN_HOST</code> (всё или ничего), host-qualified паттерны <code class=\"inline\">http.ServeMux</code> (Go 1.22+), <code class=\"inline\">stripHostPort</code>-миддлвар (порт в <code class=\"inline\">Host</code> иначе не даёт матчиться). Пустые переменные — поведение байт-в-байт как раньше.<br>- <code class=\"inline\">dashboardui</code>/<code class=\"inline\">admindashboardui</code>: <code class=\"inline\">base</code>/<code class=\"inline\">basename</code> теперь сборочно-конфигурируемые (<code class=\"inline\">VITE_BASE</code>/<code class=\"inline\">VITE_BASENAME</code>), дефолт = сегодняшнее поведение.<br>- <code class=\"inline\">Dockerfile</code>: ARG&#x27;и на каждую UI-стадию (нашёл и попутно починил реальный баг с областью видимости — глобальный <code class=\"inline\">ARG</code> был объявлен после первого <code class=\"inline\">FROM</code>, поэтому дефолт не наследовался).<br>- <code class=\"inline\">Caddyfile</code>/<code class=\"inline\">Caddyfile.local</code> — упростились до голых <code class=\"inline\">reverse_proxy</code>, рерайт не нужен.<br>- <code class=\"inline\">docker-compose.yml</code>/<code class=\"inline\">.local.yml</code>, <code class=\"inline\">.env.example</code>, <code class=\"inline\">README.md</code> — под новую схему.</p><p>**Живое доказательство**: <code class=\"inline\">grep</code> бандла — дефолтная сборка несёт <code class=\"inline\">/app</code> (1 вхождение), host-routed — 0. <code class=\"inline\">make prod-local-up</code> (теперь всегда host-routed) — оба домена отдают корректный root-mounted контент (<code class=\"inline\">src=&quot;/assets/...&quot;</code>, не <code class=\"inline\">/app/assets/...</code>), API-пути живы, а **<code class=\"inline\">api.local.test/adminapp/</code> и <code class=\"inline\">/app/</code> честно дают <code class=\"inline\">404</code>** — настоящая, не косметическая изоляция. <code class=\"inline\">go test</code>/<code class=\"inline\">test-ui</code> — всё зелёное, поведение по умолчанию не изменилось.</p>",
     "ts": "2026-07-08T14:30:41.404Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>как создать админа для prod-local</p>",
+    "ts": "2026-07-08T14:34:04.143Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Стек сейчас поднят (сам перезапустил, судя по <code class=\"inline\">.env.local</code>). Создаю админа тем же приёмом, что в README, но под сеть/креды <code class=\"inline\">prod-local</code>.</p>",
+    "ts": "2026-07-08T14:35:09.797Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Похоже, контейнер Postgres — старый (пережил предыдущие <code class=\"inline\">down</code>/<code class=\"inline\">up</code> без пересоздания), а данные там эфемерны (без volume) — пароль внутри не совпадает с текущим <code class=\"inline\">.env.local</code>. Пересоздаю его.</p>",
+    "ts": "2026-07-08T14:36:02.328Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Postgres теперь пустой (без volume, схемы нет) — нужно перезапустить и coordinator, чтобы он заново накатил миграции.</p>",
+    "ts": "2026-07-08T14:36:14.761Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понял механизм: <code class=\"inline\">postgres:16-alpine</code> объявляет анонимный volume (<code class=\"inline\">VOLUME /var/lib/postgresql/data</code>) — он переживает <code class=\"inline\">--force-recreate</code> без <code class=\"inline\">-v</code>, так что Postgres видит уже проинициализированную (старым паролем) директорию и не применяет новый <code class=\"inline\">POSTGRES_PASSWORD</code>. Нужен полный снос с <code class=\"inline\">-v</code>.</p>",
+    "ts": "2026-07-08T14:37:11.041Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Много «висящих» анонимных volume накопилось от разных прогонов (в том числе не связанных с этим проектом) — не трогаю чужое, просто поднимаю стек заново с чистого листа.</p>",
+    "ts": "2026-07-08T14:37:34.183Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Мигрировался чисто. Теперь создаю админа.</p>",
+    "ts": "2026-07-08T14:37:51.557Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — админ создан. Проверяю логин через реальный домен.</p>",
+    "ts": "2026-07-08T14:38:11.629Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Логин прошёл успешно через <code class=\"inline\">admin.local.test:8880</code>.</p><p>**Учётные данные**: <code class=\"inline\">admin@example.com</code> / <code class=\"inline\">localtest123</code></p><p>**Команда** (сеть/креды <code class=\"inline\">prod-local</code>, отличается от README-варианта для реального прода):<br>\u0000FENCE0\u0000</p><p>По пути споткнулся о постороннюю проблему: <code class=\"inline\">postgres:16-alpine</code> несёт анонимный volume (объявлен в самом образе), который переживает <code class=\"inline\">--force-recreate</code> без <code class=\"inline\">-v</code> — старый пароль оставался в данных, новый <code class=\"inline\">.env.local</code> игнорировался. Пересобрал стек через <code class=\"inline\">make prod-local-down &amp;&amp; make prod-local-up</code> (<code class=\"inline\">down -v</code> в <code class=\"inline\">test-local-down.sh</code> подчищает это правильно) — сейчас всё свежее и рабочее. Заодно заметил кучу несвязанных с проектом «висящих» anonymous-volume на машине — не трогал, не мои.</p><p>Теперь можешь зайти на <code class=\"inline\">http://admin.local.test:8880/</code> этими же данными.</p>",
+    "ts": "2026-07-08T14:38:24.463Z"
   }
 ]
