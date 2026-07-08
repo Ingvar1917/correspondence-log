@@ -6161,5 +6161,17 @@
     "who": "claude",
     "html": "<p>Всё зелёное. Готово — <code class=\"inline\">deleted</code> теперь настоящий терминальный статус:</p><p>**Бэкенд:**<br>- <code class=\"inline\">clusterregistry.Repository.SetStatus</code> больше не голый <code class=\"inline\">UPDATE</code> — отбивает любой переход *из* <code class=\"inline\">deleted</code> (<code class=\"inline\">ErrClusterDeleted</code>).<br>- <code class=\"inline\">Manager.Deprovision</code> отдельно ловит «уже удалён» (<code class=\"inline\">ErrAlreadyDeleted</code>), не путая с «сначала drain» (<code class=\"inline\">ErrMustDrainFirst</code>) — разные причины, разные сообщения.<br>- <code class=\"inline\">admindashboard/errors.go</code>: обе новые ошибки → 409 <code class=\"inline\">cluster_deleted</code>.</p><p>**Admin UI:** для <code class=\"inline\">status=deleted</code> весь блок Drain/Undrain/Delete не рендерится — вместо кнопок статичная подпись «deleted — no actions left».</p><p>**Тесты** (все прогнаны, зелёные): <code class=\"inline\">TestSetStatus_DeletedClusterIsTerminal</code>, <code class=\"inline\">TestDeprovision_AlreadyDeletedReturnsDistinctError</code>, <code class=\"inline\">TestDrainUndrainCluster_DeletedClusterIsTerminal</code>, <code class=\"inline\">TestDeleteCluster_PropagatesAlreadyDeleted</code>, плюс фронтовый тест на отсутствие кнопок.</p><p>Документация (<code class=\"inline\">WHATIF.md</code>, <code class=\"inline\">ADMIN_UI_MAP.md</code>) обновлена — новая строка описывает, что было и как исправлено. Не закоммичено — оставляю тебе, как обычно.</p>",
     "ts": "2026-07-08T09:58:05.678Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделал коммит</p>",
+    "ts": "2026-07-08T10:00:17.620Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Принято.</p>",
+    "ts": "2026-07-08T10:00:23.976Z"
   }
 ]
