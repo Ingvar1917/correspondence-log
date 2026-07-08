@@ -6917,5 +6917,77 @@
     "who": "claude",
     "html": "<p>Принято.</p>",
     "ts": "2026-07-08T11:23:57.116Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>2026/07/08 13:25:18 [dashboardapi] internal error: copy external archive: copy object presets/0db1ada0-4556-403f-a829-0a6ecae941c8/server.tar.gz -&gt; builds/e4bb674f-5323-4a65-b294-b6aef26a809c/846e1ade-f8ba-4e50-b376-7f8404d4750c.tar.gz: operation error S3: CopyObject, https response error StatusCode: 404, RequestID: 18C04CD2619932F0, HostID: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, api error NoSuchKey: The specified key does not exist.</p>",
+    "ts": "2026-07-08T11:25:35.814Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это уже известная и задокументированная проблема (WHATIF.md:29, найдена 2026-07-06) — у MinIO/registry в dev-кластере вообще нет volume, любой рестарт пода стирает всё содержимое. Сейчас словили ровно третий из трёх задокументированных тогда же симптомов: пресет «Unity FPS starter (test)» (<code class=\"inline\">0db1ada0-...</code>) загружен 2026-07-06, помечен в БД <code class=\"inline\">ready</code>, но архив <code class=\"inline\">server.tar.gz</code> физически стёрт при рестарте MinIO — Postgres пережил рестарт (у него хоть <code class=\"inline\">emptyDir</code>), а MinIO/registry нет.</p><p>Быстрый фикс — пересеять архив пресета через admin API (как уже написано в WHATIF), но это тестовые данные без исходного архива под рукой, так что реально быстрее пересоздать пресет заново через Admin UI. Постоянный фикс — добавить PVC на оба Deployment&#x27;а (<code class=\"inline\">minio.yaml</code>/<code class=\"inline\">registry.yaml</code>), тогда это вообще перестанет всплывать.</p>",
+    "ts": "2026-07-08T11:28:32.424Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Есть дефолтный <code class=\"inline\">standard</code> storageclass (local-path-provisioner). Добавляю PVC на MinIO и registry.</p>",
+    "ts": "2026-07-08T11:29:55.299Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь registry.yaml.</p>",
+    "ts": "2026-07-08T11:30:03.304Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Применяю на живом кластере и проверяю, что данные переживут рестарт.</p>",
+    "ts": "2026-07-08T11:30:13.517Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Как и ожидалось, при переезде на PVC оба хранилища снова пустые. Пересоздаю бакет и образы, затем проверяю переживание рестарта.</p>",
+    "ts": "2026-07-08T11:30:36.376Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь проверяю, что рестарт пода реально не стирает данные (симулирую то, что раньше вызывало потерю).</p>",
+    "ts": "2026-07-08T11:31:12.309Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">gamebase</code> пережил полный delete+recreate пода — PVC работает. Проверяю бакет MinIO аналогично.</p>",
+    "ts": "2026-07-08T11:33:31.674Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Бакет <code class=\"inline\">builds</code> тоже цел после рестарта (пуст, но существует — ошибки NoSuchBucket нет). PVC-фикс работает. Финальная проверка — живой e2e билд-пайплайна.</p>",
+    "ts": "2026-07-08T11:33:50.209Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>PASS. Обновляю WHATIF.md — вычёркиваю пункт про недостающий PVC.</p>",
+    "ts": "2026-07-08T11:34:20.480Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь исправляю сам сломанный пресет — данные физически потеряны, DB-запись нужно пересоздать.</p>",
+    "ts": "2026-07-08T11:35:04.754Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>1. **Причина ошибки** — известный баг (WHATIF.md, найден 2026-07-06): у MinIO/registry в dev-кластере не было volume, рестарт пода стирал всё. Тестовый пресет был загружен до одного из таких рестартов — его <code class=\"inline\">server.tar.gz</code> физически пропал, а строка в БД осталась с <code class=\"inline\">server_status=&#x27;ready&#x27;</code>.<br>2. **Постоянный фикс** — добавил <code class=\"inline\">PersistentVolumeClaim</code> + <code class=\"inline\">volumeMounts</code> + <code class=\"inline\">strategy: Recreate</code> в [minio.yaml](deploy/local/minio.yaml) и [registry.yaml](deploy/local/registry.yaml) (дефолтный kind storageclass <code class=\"inline\">standard</code>/local-path). Проверил живьём: <code class=\"inline\">kubectl delete pod</code> на оба Deployment&#x27;а — содержимое бакета и registry пережило пересоздание пода.<br>3. **Разблокировка**: удалил битую строку пресета из БД (данных всё равно не существует физически) — пересоздайте пресет через Admin UI, новый переживёт любой будущий рестарт.<br>4. <code class=\"inline\">make test-e2e-builds</code> зелёный, WHATIF.md обновлён.</p>",
+    "ts": "2026-07-08T11:35:24.818Z"
   }
 ]
