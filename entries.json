@@ -7001,5 +7001,17 @@
     "who": "claude",
     "html": "<p>Менеджер уже почти есть — [presets/repository.go](internal/coordinator/presets/repository.go:46) хранит серверный архив + client-артефакты по трём ОС, и CRUD/аплоад/пикер в обоих UI уже реализованы (прошлая сессия). Реального дельта тут два новых поля: <code class=\"inline\">engine</code> и <code class=\"inline\">repo_url</code>.</p><p>Единственная развилка — <code class=\"inline\">engine</code> свободным текстом или закрытым списком (Unity/Unreal/Godot/Custom + CHECK-constraint, как уже сделано для <code class=\"inline\">server_archive_format</code>). Я бы взял закрытый список: он даёт индюку фильтр «покажи только Unity-пресеты» в <code class=\"inline\">/presets</code>, а свободный текст такого не даёт и множит опечатки-дубликаты («unity»/«Unity3D»/...). <code class=\"inline\">repo_url</code> — просто nullable text, тут спорить не о чем.</p><p>Стоит ли считать это отдельным этапом (миграция + admin-форма + отображение в PresetPicker) или добавить прямо в текущую схему?</p>",
     "ts": "2026-07-08T11:39:14.400Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>что значит  добавить прямо в текущую схему?</p>",
+    "ts": "2026-07-08T11:40:39.812Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Имел в виду: не заводить это отдельным мини-проектом с планом/этапами (как было с Units), а просто расширить то, что уже есть — сейчас <code class=\"inline\">presets</code> это одна таблица (<code class=\"inline\">internal/coordinator/presets/repository.go:46</code> + её migration), один <code class=\"inline\">Repository</code>, один admin CRUD-хендлер, один <code class=\"inline\">PresetPicker</code> в indie UI.</p><p>«Добавить прямо в схему» = один маленький migration с двумя колонками в существующую таблицу <code class=\"inline\">presets</code>:<br>\u0000FENCE0\u0000<br>— плюс два поля в <code class=\"inline\">Preset</code>-структуре, <code class=\"inline\">admin*Request</code>/<code class=\"inline\">*View</code> DTO, и вывод в существующей карточке <code class=\"inline\">PresetPicker</code> — без нового пакета, без нового плана, без разбивки на этапы. Это отличается от подхода Units/CRUD-кластеров тем, что там появлялись новые таблицы/пакеты/инвариантные решения (тариф vs RAM, circuit breaker) — здесь новых сущностей нет, просто два атрибута на уже существующей.</p><p>Против: если тебе нужно продумать что-то нетривиальное сверху (например, автоматическую валидацию repo_url, или разные наборы полей для разных движков) — тогда это перестаёт быть «просто колонка» и стоит написать план. Но по твоему описанию похоже, что это именно этот случай — маленькое расширение, не новая подсистема.</p>",
+    "ts": "2026-07-08T11:40:53.846Z"
   }
 ]
