@@ -6191,5 +6191,473 @@
     "who": "claude",
     "html": "<p>Запустил исследовательский агент, чтобы разобрать существующий код (launcher, sessionmanager, metrics, accounts, dashboardapi) и понять, куда естественнее всего лягут units-баланс и кастомный RAM. Жду результат, потом соберу план.</p>",
     "ts": "2026-07-08T10:08:14.401Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>&lt;task-notification&gt;<br>&lt;task-id&gt;a3f9b840cfccce486&lt;/task-id&gt;<br>&lt;tool-use-id&gt;toolu_01DUCwkPaTbR7cHhEMDqo1pX&lt;/tool-use-id&gt;<br>&lt;output-file&gt;/tmp/claude-1000/-home-ihar-Games-coordinator/de68a98e-fb8b-4fd0-b77a-d494a7cb416b/tasks/a3f9b840cfccce486.output&lt;/output-file&gt;<br>&lt;status&gt;completed&lt;/status&gt;<br>&lt;summary&gt;Agent &quot;Explore billing-adjacent code for units design&quot; finished&lt;/summary&gt;<br>&lt;note&gt;A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.&lt;/note&gt;<br>&lt;result&gt;Now I have everything needed for a concise report.</p><p>## 1. <code class=\"inline\">launchRegion</code> — where RAM/vCPU hit the Fleet spec</p><p><code class=\"inline\">internal/coordinator/launcher/launcher.go:256-290</code>. The tariff is looked up once in <code class=\"inline\">Launch</code> (line 228: <code class=\"inline\">tariff, err := l.tariffs.GetByID(ctx, game.TariffID)</code>) and threaded into <code class=\"inline\">launchRegion</code> as a parameter (<code class=\"inline\">tariff *tariffs.Tariff</code>, signature at line 256). The actual assignment onto <code class=\"inline\">agones.FleetSpec</code> is:</p><pre><code>// launcher.go:272-273\nRAMMb:           tariff.RAMMbPerSession,\nVCPU:            tariff.VCPUPerSession,\n</code></pre><p>inside the <code class=\"inline\">spec := agones.FleetSpec{...}</code> literal at line 262. <code class=\"inline\">tariffs.Tariff</code> itself (<code class=\"inline\">internal/coordinator/tariffs/repository.go:18-29</code>) has <code class=\"inline\">RAMMbPerSession int</code>, <code class=\"inline\">VCPUPerSession float64</code>, plus money fields already living there: <code class=\"inline\">PriceUSDCents int</code>, <code class=\"inline\">SessionsIncluded int</code>, <code class=\"inline\">PAYGRateUSDCentsPerSessionHour *int</code>. A per-game custom RAM override would read from <code class=\"inline\">game.*</code> (or a new <code class=\"inline\">games</code> column) at line 272 instead of/alongside <code class=\"inline\">tariff.RAMMbPerSession</code> — <code class=\"inline\">game *games.Game</code> is already in scope in <code class=\"inline\">launchRegion</code>.</p><p>## 2. Background loop precedent — <code class=\"inline\">sessionmanager</code></p><p><code class=\"inline\">RunReconciliation</code> (<code class=\"inline\">internal/coordinator/sessionmanager/manager.go:147-160</code>) is the exact ticker shape: runs once immediately, then <code class=\"inline\">ticker := time.NewTicker(interval)</code> / <code class=\"inline\">select { case &amp;lt;-ctx.Done(): return; case &amp;lt;-ticker.C: m.reconcileOnce(...) }</code>. <code class=\"inline\">reconcileOnce</code> (162-207) lists live state per cluster (<code class=\"inline\">m.client.ListGameServers</code>) and cross-references DB state (<code class=\"inline\">m.sessions.ListActiveForReconcile(ctx, clusterID, ...)</code>), taking <code class=\"inline\">clusterID uuid.UUID</code> as an explicit parameter. Started per-cluster in <code class=\"inline\">cmd/coordinator/main.go:398-406</code>, inside a <code class=\"inline\">for _, cl := range activeClusters</code> fan-out (loop starts at ~388) — one goroutine per registered cluster, each given its own <code class=\"inline\">agones.Client</code> built from that cluster&#x27;s kubeconfig. A billing loop would follow the identical pattern: <code class=\"inline\">New(...)</code>, a <code class=\"inline\">Run(ctx, clusterID, interval)</code> with the same ticker skeleton, started in that same <code class=\"inline\">for _, cl := range activeClusters</code> block in main.go.</p><p>## 3. <code class=\"inline\">metrics.Collector</code> — reusable per-instance state</p><p><code class=\"inline\">internal/coordinator/metrics/collector.go</code>. <code class=\"inline\">Collector.Run</code> (72-84) is the same ticker pattern, calling <code class=\"inline\">collectOnce</code> (86-142) which does <code class=\"inline\">ListFleetStatuses</code> + <code class=\"inline\">ListGameServers</code> + best-effort <code class=\"inline\">ListPodResourceUsage</code>. The persisted <code class=\"inline\">Snapshot</code> (<code class=\"inline\">metrics/metrics.go:40-53</code>) already carries, per game/cluster/tick: <code class=\"inline\">DesiredReplicas</code>, <code class=\"inline\">ReadyReplicas</code>, <code class=\"inline\">ReservedReplicas</code>, <code class=\"inline\">AllocatedReplicas int32</code>, plus <code class=\"inline\">*CPUMillicores</code>, <code class=\"inline\">*MemoryBytes</code>, <code class=\"inline\">*PodsMeasured</code>, <code class=\"inline\">*PlayersConnected</code>. This is real (metrics-server-measured) resource usage, not tariff-derived — it does *not* currently know the tariff&#x27;s <code class=\"inline\">RAMMbPerSession</code>, only actual pod usage when metrics-server is installed (best-effort, can be nil). A billing loop could piggyback on this same collection tick (it already has <code class=\"inline\">AllocatedReplicas</code>/<code class=\"inline\">ReadyReplicas</code> per game per cluster) and multiply by <code class=\"inline\">tariff.RAMMbPerSession</code> itself, or add tariff lookup into <code class=\"inline\">collectOnce</code>, rather than writing a new k8s-polling loop — <code class=\"inline\">ListFleetStatuses</code>/<code class=\"inline\">ListGameServers</code> are already interface methods on <code class=\"inline\">ClusterSource</code> (33-36).</p><p>## 4. <code class=\"inline\">accounts.Account</code>/<code class=\"inline\">Repository</code></p><p>Note: the DB row has more than the exposed struct. Migration <code class=\"inline\">000002_create_accounts.up.sql:1-9</code> defines: <code class=\"inline\">id</code>, <code class=\"inline\">email</code>, <code class=\"inline\">password_hash</code>, <code class=\"inline\">payment_method_token TEXT</code>, <code class=\"inline\">trial_used BOOLEAN NOT NULL DEFAULT false</code>, <code class=\"inline\">created_at</code>, <code class=\"inline\">updated_at</code>; <code class=\"inline\">suspended_at</code> added later by <code class=\"inline\">000022_add_cluster_draining_and_account_suspend.up.sql</code>. But the Go <code class=\"inline\">Account</code> struct (<code class=\"inline\">accounts/repository.go:48-54</code>) only exposes <code class=\"inline\">ID, Email, SuspendedAt, CreatedAt, UpdatedAt</code> — <code class=\"inline\">payment_method_token</code>/<code class=\"inline\">trial_used</code>/<code class=\"inline\">password_hash</code> are deliberately not surfaced outside the package (comment at line 42-44: &quot;never the password hash&quot;). Money-like data is already precedented as living in its own table rather than on <code class=\"inline\">accounts</code>: <code class=\"inline\">tariffs.Tariff</code> holds <code class=\"inline\">PriceUSDCents</code>/<code class=\"inline\">PAYGRateUSDCentsPerSessionHour</code> (tariffs/repository.go:23,27), and there is no existing ledger/billing/invoice table (grep across <code class=\"inline\">migrations/</code> and <code class=\"inline\">internal/</code> found none). Given that pattern, a <code class=\"inline\">units_balance</code> column bolted onto <code class=\"inline\">accounts</code> would be the outlier — a separate <code class=\"inline\">unit_ledger</code>/<code class=\"inline\">account_balance</code> table (keyed by <code class=\"inline\">account_id</code>, following the <code class=\"inline\">tariffs</code> precedent of isolating money concerns) fits the codebase&#x27;s existing separation better, especially since a billing loop needs append/debit history, not just a single mutable counter.</p><p>## 5. <code class=\"inline\">handleCreateGame</code>/<code class=\"inline\">handleUpdateGame</code> DTOs</p><p><code class=\"inline\">internal/coordinator/dashboardapi/handlers.go</code>:<br>- <code class=\"inline\">createGameRequest</code> (123-128): <code class=\"inline\">Name string</code>, <code class=\"inline\">ImageURL string</code>, <code class=\"inline\">LobbyMode string</code>, <code class=\"inline\">MaxPlayersDefault int</code> — all JSON-tagged, validated at 146-155 (<code class=\"inline\">name</code> required, <code class=\"inline\">lobby_mode</code> must be <code class=\"inline\">db</code>/<code class=\"inline\">server</code>).<br>- <code class=\"inline\">updateGameRequest</code> (209-218): <code class=\"inline\">Name *string</code>, <code class=\"inline\">ImageURL *string</code>, <code class=\"inline\">LobbyMode *string</code>, <code class=\"inline\">MaxPlayersDefault *int</code>, <code class=\"inline\">OverflowMode *string</code>, <code class=\"inline\">TariffID *string</code>, <code class=\"inline\">GamePort *int</code>, <code class=\"inline\">EnvVars json.RawMessage</code> — pointer fields for partial-update semantics (<code class=\"inline\">games.UpdateParams</code>), built at 252-261.</p><p>A new <code class=\"inline\">ram_mb</code> field (per-game RAM override) would slot as <code class=\"inline\">RAMMb *int \\</code>json:&quot;ram_mb&quot;\\`<code class=\"inline\"> in both </code>createGameRequest<code class=\"inline\">/</code>updateGameRequest<code class=\"inline\">, validated alongside the existing </code>lobby_mode<code class=\"inline\">/</code>overflow_mode<code class=\"inline\"> checks (147-155, 240-249), then threaded through </code>games.CreateParams<code class=\"inline\">/</code>games.UpdateParams<code class=\"inline\"> the same way </code>TariffID<code class=\"inline\">/</code>GamePort<code class=\"inline\"> are — ultimately consumed at </code>launcher.go:272<code class=\"inline\"> where it would override </code>tariff.RAMMbPerSession`.&lt;/result&gt;<br>&lt;usage&gt;&lt;subagent_tokens&gt;43779&lt;/subagent_tokens&gt;&lt;tool_uses&gt;20&lt;/tool_uses&gt;&lt;duration_ms&gt;61825&lt;/duration_ms&gt;&lt;/usage&gt;<br>&lt;/task-notification&gt;</p>",
+    "ts": "2026-07-08T10:09:10.707Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собрал картину по существующему коду. Предлагаю схему и хочу закрыть последнюю развилку, прежде чем садиться писать план.</p><p>**Где что живёт (по разведке):**<br>- <code class=\"inline\">games.ram_mb</code> (новая колонка, nullable — <code class=\"inline\">NULL</code> = «беру дефолт тарифа», как сейчас работает <code class=\"inline\">tariff_id</code>). В <code class=\"inline\">launcher.go:272</code> заменяет <code class=\"inline\">tariff.RAMMbPerSession</code>, если задано.<br>- В <code class=\"inline\">tariffs</code> добавляю <code class=\"inline\">ram_mb_max</code> — потолок, <code class=\"inline\">ram_mb_per_session</code> (уже есть) становится нижней границей/дефолтом. Валидация при создании/обновлении игры: <code class=\"inline\">tariff.RAMMbPerSession ≤ games.ram_mb ≤ tariff.RAMMbMax</code>.<br>- **Units — отдельная таблица** (<code class=\"inline\">account_balances</code>), не колонка на <code class=\"inline\">accounts</code>: разведка подтвердила, что денежные штуки в этой кодовой базе уже осознанно живут отдельно от <code class=\"inline\">accounts</code> (пример — <code class=\"inline\">tariffs.price_usd_cents</code>/<code class=\"inline\">payg_rate...</code>, ни то ни другое не на <code class=\"inline\">accounts</code>). Полного леджера каждого тика **не делаю** — при списании раз в тик по каждому инстансу это будет расти бесконечно, а для «почему баланс так упал» уже есть <code class=\"inline\">gameserver_metrics</code> (история того, что реально работало) — отдельный <code class=\"inline\">unit_transactions</code> завожу только под редкие дискретные события (пополнение админом, ручная корректировка).<br>- **Ставка** — плоская, одна на платформу (env <code class=\"inline\">UNITS_PER_MB_HOUR</code>), не per-тариф: разные тарифы уже дифференцируются потолком RAM/сессиями/buffer&#x27;ом, а MB-час инфраструктуры стоит одинаково независимо от тарифа. Проще для v1, per-тариф ставку добавить потом — не ломающее изменение.<br>- **Списание — не новый поллинг k8s.** <code class=\"inline\">metrics.Collector</code> уже тикает по каждому кластеру и уже знает <code class=\"inline\">ReadyReplicas</code>/<code class=\"inline\">AllocatedReplicas</code> на игру за тик, кладёт в <code class=\"inline\">gameserver_metrics</code>. Биллинг-луп по твоему выбору («буфер тоже платный») просто читает последнюю строку метрик на игру и списывает <code class=\"inline\">(ReadyReplicas + AllocatedReplicas) × ram_mb × UNITS_PER_MB_HOUR × время_с_прошлого_тика</code> — без второго похода в k8s API.</p><p>**Развилка, которую не хочу решать за тебя:** что происходит, когда баланс закончился?</p>",
+    "ts": "2026-07-08T10:10:29.428Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь пишу план.</p>",
+    "ts": "2026-07-08T10:14:18.365Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Миграции готовы. Теперь <code class=\"inline\">tariffs</code> — поле <code class=\"inline\">RAMMbMax</code>.</p>",
+    "ts": "2026-07-08T10:16:30.897Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю компиляцию и тесты пакета <code class=\"inline\">tariffs</code>.</p>",
+    "ts": "2026-07-08T10:17:14.857Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется, тест зелёный. Теперь <code class=\"inline\">games</code> — поле <code class=\"inline\">RAMMb</code> + валидация.</p>",
+    "ts": "2026-07-08T10:17:27.688Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю сам <code class=\"inline\">UPDATE</code> — добавляю <code class=\"inline\">ram_mb = COALESCE($11, ram_mb)</code>.</p>",
+    "ts": "2026-07-08T10:20:06.759Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую пакет <code class=\"inline\">games</code>.</p>",
+    "ts": "2026-07-08T10:20:16.850Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Прогоняю тесты пакета <code class=\"inline\">games</code> — они должны пройти (RAM не тронула существующее поведение), и добавляю новые тесты на границы.</p>",
+    "ts": "2026-07-08T10:20:24.765Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Найден дублирующий scan. Правлю.</p>",
+    "ts": "2026-07-08T10:20:38.092Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все тесты зелёные. Добавляю новые тесты на RAM-границы.</p>",
+    "ts": "2026-07-08T10:21:04.663Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все три новых теста проходят. Отмечаю <code class=\"inline\">games</code> завершённым и перехожу к <code class=\"inline\">launcher.go</code>.</p>",
+    "ts": "2026-07-08T10:21:37.919Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Правлю <code class=\"inline\">launcher.go</code>:</p>",
+    "ts": "2026-07-08T10:21:58.268Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь пишу тест на кастомный RAM в <code class=\"inline\">launcher_test.go</code>.</p>",
+    "ts": "2026-07-08T10:22:40.557Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба теста зелёные. Прогоняю весь пакет <code class=\"inline\">launcher</code>, чтобы убедиться, что ничего не сломал.</p>",
+    "ts": "2026-07-08T10:23:15.842Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Теперь новый пакет <code class=\"inline\">units</code>.</p>",
+    "ts": "2026-07-08T10:23:27.815Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тесты для пакета <code class=\"inline\">units</code>. Смотрю на паттерн сидирования аккаунта в другом пакете (например <code class=\"inline\">sessions</code> или <code class=\"inline\">games</code>).</p>",
+    "ts": "2026-07-08T10:24:17.142Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понятен паттерн. Пишу <code class=\"inline\">units/repository_test.go</code>.</p>",
+    "ts": "2026-07-08T10:24:24.348Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 5 тестов зелёные. Теперь <code class=\"inline\">admindashboard</code> — эндпоинты баланса/топапа.</p>",
+    "ts": "2026-07-08T10:24:50.368Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю роуты:</p>",
+    "ts": "2026-07-08T10:25:34.561Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сами хендлеры и DTO. Смотрю на конец <code class=\"inline\">handlers.go</code>, где определён suspend, чтобы вставить рядом.</p>",
+    "ts": "2026-07-08T10:25:41.348Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь DTO в <code class=\"inline\">dto.go</code>:</p>",
+    "ts": "2026-07-08T10:25:59.245Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь маппинг ошибок в errors.go для <code class=\"inline\">units</code> (если понадобится, например <code class=\"inline\">strconv</code>/пустая причина уже отбита в хендлере) и компиляция.</p>",
+    "ts": "2026-07-08T10:26:15.463Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо. Правлю <code class=\"inline\">main.go</code> — создаю <code class=\"inline\">units.Repository</code> и передаю в конструктор.</p>",
+    "ts": "2026-07-08T10:26:19.860Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Обновляю тест <code class=\"inline\">handlers_test.go</code> (setupEnv) под новый параметр и добавляю тесты для новых хендлеров.</p>",
+    "ts": "2026-07-08T10:27:09.241Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нужно добавить импорт <code class=\"inline\">units</code>.</p>",
+    "ts": "2026-07-08T10:27:32.107Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую и добавляю тесты для новых хендлеров.</p>",
+    "ts": "2026-07-08T10:27:41.779Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь тесты для баланса/топапа.</p>",
+    "ts": "2026-07-08T10:27:48.271Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогоняю весь пакет <code class=\"inline\">admindashboard</code>, чтобы убедиться, что ничего не сломано.</p>",
+    "ts": "2026-07-08T10:28:38.548Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Отлично, весь пакет зелёный. Переходим к <code class=\"inline\">dashboardapi</code>.</p>",
+    "ts": "2026-07-08T10:28:52.037Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь могу редактировать безопасно.</p>",
+    "ts": "2026-07-08T10:29:33.909Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">tariffView</code> — добавляю <code class=\"inline\">RAMMbMax</code>:</p>",
+    "ts": "2026-07-08T10:29:44.454Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сам хендлер — добавляю рядом с <code class=\"inline\">handleListTariffs</code>.</p>",
+    "ts": "2026-07-08T10:30:59.995Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю <code class=\"inline\">balanceView</code> в dto.go.</p>",
+    "ts": "2026-07-08T10:31:11.745Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">main.go</code> — обновляю вызов <code class=\"inline\">dashboardapi.NewServer</code>.</p>",
+    "ts": "2026-07-08T10:31:18.121Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую весь проект.</p>",
+    "ts": "2026-07-08T10:31:28.154Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь обновляю тесты <code class=\"inline\">dashboardapi</code> под новый параметр <code class=\"inline\">NewServer</code> и добавляю тесты RAM/баланса.</p>",
+    "ts": "2026-07-08T10:31:36.349Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Прогоняю пакет <code class=\"inline\">dashboardapi</code>, чтобы убедиться, что существующие тесты не сломаны.</p>",
+    "ts": "2026-07-08T10:32:09.657Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю новые тесты — RAM в update game и <code class=\"inline\">GET /account/balance</code>.</p>",
+    "ts": "2026-07-08T10:32:25.383Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю новые тесты после <code class=\"inline\">TestUpdateGame_CrossAccountNotFound</code>.</p>",
+    "ts": "2026-07-08T10:32:47.285Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 5 новых тестов зелёные. Прогоняю весь пакет и полный <code class=\"inline\">make test-short</code> для контроля регрессий.</p>",
+    "ts": "2026-07-08T10:33:47.162Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Весь бэкенд зелёный. Отмечаю прогресс и перехожу к фронтам (Indie UI + Admin UI).</p>",
+    "ts": "2026-07-08T10:34:07.290Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю <code class=\"inline\">useEffect</code> для синхронизации дефолта и сам UI-контрол для RAM в карточке текущего тарифа.</p>",
+    "ts": "2026-07-08T10:35:59.335Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю сам input в карточку текущего тарифа:</p>",
+    "ts": "2026-07-08T10:36:12.433Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю ключи <code class=\"inline\">games.balance</code>/<code class=\"inline\">games.balanceHint</code> в i18n:</p>",
+    "ts": "2026-07-08T10:37:23.646Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую фронт и прогоняю тесты.</p>",
+    "ts": "2026-07-08T10:37:38.546Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All 8 tests pass. Теперь добавляю тест для баланса на <code class=\"inline\">GamesListPage</code>.</p>",
+    "ts": "2026-07-08T10:39:08.736Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все существующие тесты проходят. Добавляю handler для баланса и небольшой тест на бейдж.</p>",
+    "ts": "2026-07-08T10:39:29.104Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All handlers updated correctly. Прогоняю весь фронт indie ещё раз.</p>",
+    "ts": "2026-07-08T10:40:10.297Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 74 теста зелёные, <code class=\"inline\">tsc</code> чист. Indie UI готов. Переходим к Admin UI — форма топапа units.</p>",
+    "ts": "2026-07-08T10:40:21.688Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю <code class=\"inline\">common.save</code> и остальные ключи в admin-словарь, затем сам компонент.</p>",
+    "ts": "2026-07-08T10:41:16.552Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сам компонент в <code class=\"inline\">GamesPage.tsx</code>:</p>",
+    "ts": "2026-07-08T10:41:33.972Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нужно добавить тип <code class=\"inline\">Balance</code> в admindashboardui/src/api/types.ts.</p>",
+    "ts": "2026-07-08T10:41:47.430Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю сам компонент и подключаю в разметку строки игры.</p>",
+    "ts": "2026-07-08T10:41:59.521Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Прогоняю vitest — ожидаю поломки существующих тестов GamesPage (нет мока <code class=\"inline\">/admin/accounts/{id}/balance</code>).</p>",
+    "ts": "2026-07-08T10:42:26.403Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все существующие тесты прошли. Добавляю тесты на топап.</p>",
+    "ts": "2026-07-08T10:42:36.477Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 18 тестов зелёные. Прогоняю весь фронт админки и <code class=\"inline\">tsc</code> ещё раз для полной уверенности.</p>",
+    "ts": "2026-07-08T10:43:43.199Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Обновляю статус и прогоняю полный бэкенд ещё раз для финальной проверки перед живым прогоном.</p>",
+    "ts": "2026-07-08T10:43:52.307Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Весь набор зелёный. Теперь живой прогон через <code class=\"inline\">make dev-stack</code>.</p>",
+    "ts": "2026-07-08T10:44:36.853Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Migrations applied cleanly, coordinator up. Регистрирую индюка и создаю игру с кастомным RAM.</p>",
+    "ts": "2026-07-08T10:45:27.956Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">ram_mb_max</code> реально приходит с API. Настраиваю игру: порт, кастомный RAM, регион, образ (без билда — используем готовый образ), запускаю.</p>",
+    "ts": "2026-07-08T10:45:45.249Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Барьер сработал, RAM=256 сохранён. Добавляю регион и запускаю.</p>",
+    "ts": "2026-07-08T10:46:07.035Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Fleet запущен. Проверяю реальный RAM-запрос контейнера через <code class=\"inline\">kubectl</code>.</p>",
+    "ts": "2026-07-08T10:46:15.077Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Реальный под подтверждает <code class=\"inline\">memory: 256Mi</code> — именно кастомное значение, не дефолт тарифа (128Mi). Теперь проверяю топап баланса через Admin API.</p>",
+    "ts": "2026-07-08T10:46:44.136Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Индюк видит обновлённый баланс через свой API:</p>",
+    "ts": "2026-07-08T10:47:01.201Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Весь цикл подтверждён живьём: кастомный RAM реально дошёл до пода в k8s, границы тарифа проверяются, топап админом отражается у индюка. Останавливаю игру и стек, чищу окружение.</p>",
+    "ts": "2026-07-08T10:47:10.296Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Fleet тестовой игры снесён. Гашу <code class=\"inline\">dev-stack</code>.</p>",
+    "ts": "2026-07-08T10:47:23.148Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю, что in-cluster app снова здоров (та же миграция уже была применена одновременно локальным бинарём — теперь риска рассинхронизации нет, т.к. образ уже пересобирался ранее в этой сессии).</p>",
+    "ts": "2026-07-08T10:47:30.020Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тот же паттерн, что раньше — новые миграции 000031/000032 применил локальный бинарь, а in-cluster образ их не знает. Пересобираю образ.</p>",
+    "ts": "2026-07-08T10:47:43.306Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Окружение снова здорово, <code class=\"inline\">/app/</code> отдаёт 200. Обновляю документацию.</p>",
+    "ts": "2026-07-08T10:48:38.548Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю пункт 12 в чеклист.</p>",
+    "ts": "2026-07-08T10:49:15.144Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю строку в WHATIF.md про повторяющуюся проблему рассинхронизации миграций.</p>",
+    "ts": "2026-07-08T10:49:52.624Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">INDIE_UI_MAP.md</code>:</p>",
+    "ts": "2026-07-08T10:50:10.622Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю чеклист, реестр ключей и раздел Settings.</p>",
+    "ts": "2026-07-08T10:50:24.123Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">ADMIN_UI_MAP.md</code> — реестр ключей и чеклист.</p>",
+    "ts": "2026-07-08T10:50:59.012Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальная сверка — весь стек ещё раз.</p>",
+    "ts": "2026-07-08T10:51:30.416Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Завершаю.</p>",
+    "ts": "2026-07-08T10:52:01.546Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>## Готово: Units (внутренняя валюта) + кастомный RAM, этап 1</p><p>**Схема:** <code class=\"inline\">tariffs.ram_mb_max</code> (потолок; <code class=\"inline\">ram_mb_per_session</code> — пол/дефолт), <code class=\"inline\">games.ram_mb</code> (nullable — кастом в границах тарифа), новые таблицы <code class=\"inline\">account_balances</code>/<code class=\"inline\">unit_transactions</code>.</p><p>**Бэкенд:**<br>- <code class=\"inline\">games.Repository.Update</code> валидирует RAM против *эффективного* тарифа (нового, если тариф меняется тем же вызовом), новая <code class=\"inline\">ErrRAMOutOfTariffBounds</code>.<br>- <code class=\"inline\">launcher.go</code> берёт <code class=\"inline\">game.RAMMb</code>, если задан, иначе тарифный дефолт.<br>- Новый пакет <code class=\"inline\">units</code> (<code class=\"inline\">GetBalance</code>/<code class=\"inline\">TopUp</code>, топап — только дискретные события, не леджер каждого тика).<br>- <code class=\"inline\">admindashboard</code>: <code class=\"inline\">GET/POST /accounts/{id}/balance</code>, <code class=\"inline\">/units</code>. <code class=\"inline\">dashboardapi</code>: <code class=\"inline\">GET /account/balance</code>, <code class=\"inline\">ram_mb</code> в create/update.</p><p>**UI:** Indie — кастомный RAM на карточке текущего тарифа (Settings), read-only баланс в шапке списка игр. Admin — баланс + форма топапа (delta+reason, confirm) на строке игры.</p><p>**Проверено:**<br>- <code class=\"inline\">make test</code> — весь Go-набор зелёный (новые тесты в <code class=\"inline\">games</code>, <code class=\"inline\">launcher</code>, <code class=\"inline\">units</code>, <code class=\"inline\">admindashboard</code>, <code class=\"inline\">dashboardapi</code>).<br>- Оба фронта — <code class=\"inline\">tsc</code> чист, все тесты зелёные (74 indie + 18 admin).<br>- Живьём (<code class=\"inline\">make dev-stack</code>): создал игру, задал <code class=\"inline\">ram_mb=256</code> (в границах free-тарифа 128–512), попытка выйти за границы (1000) честно отбита 400 — реальный под в k8s получил <code class=\"inline\">memory: 256Mi</code>, не тарифный дефолт 128Mi. Админ топапнул баланс — индюк увидел изменение мгновенно.<br>- Побочно найдена и починена та же проблема с рассинхронизацией in-cluster образа после новой миграции (уже описанная в WHATIF.md с прошлого раза) — добавил её как отдельную строку-паттерн, раз повторилась дважды за день.</p><p>Документация обновлена (<code class=\"inline\">PROJECT_MAP.md</code> п.12, <code class=\"inline\">WHATIF.md</code>, <code class=\"inline\">INDIE_UI_MAP.md</code>, <code class=\"inline\">ADMIN_UI_MAP.md</code>).</p><p>**Осознанно не в этом этапе (этап 2):** сам метред-луп списания (по <code class=\"inline\">DesiredReplicas × ram_mb × ставка</code>, читает уже собранные <code class=\"inline\">gameserver_metrics</code>) + cost circuit breaker (баланс ≤0 → <code class=\"inline\">launcher.Stop</code>) + уведомление индюку.</p>",
+    "ts": "2026-07-08T10:52:34.352Z"
   }
 ]
