@@ -11609,5 +11609,77 @@
     "who": "ihar",
     "html": "<p>на какой технологии реализован live log инстанса для игры , я не вижу в браузере никаних запросов на обновление лога</p>",
     "ts": "2026-07-11T19:44:58.282Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это SSE (Server-Sent Events) — и то, что ты не видишь запросов на обновление, как раз признак его нормальной работы: **обновляющихся запросов нет вообще, есть одно постоянно открытое соединение**, в которое сервер сам дописывает строки по мере их появления.</p><p>Цепочка целиком:</p><p>- Браузер: [LogDrawer.tsx:25](dashboardui/src/features/overview/LogDrawer.tsx#L25) открывает нативный <code class=\"inline\">new EventSource(streamUrl)</code> — один GET на <code class=\"inline\">/dashboard/games/{id}/instances/{instance}/logs/stream</code>, который никогда не завершается, пока открыт drawer. Авторизация — httpOnly-кука <code class=\"inline\">dashboard_session</code>, она едет с этим запросом сама (это было ключевым доводом за SSE против WebSocket: <code class=\"inline\">EventSource</code> не умеет ставить Authorization-заголовок, а кука работает).<br>- Coordinator: хендлер отвечает <code class=\"inline\">Content-Type: text/event-stream</code> ([handlers.go:679](internal/coordinator/dashboardapi/handlers.go#L679)) и держит соединение, транслируя туда лог-строки, которые сам читает из k8s API (<code class=\"inline\">GetLogs</code> с follow у пода инстанса) — то есть вторая половина цепочки тоже стрим, от kubelet&#x27;а до coordinator&#x27;а.</p><p>Где это увидеть в DevTools: вкладка Network → запрос на <code class=\"inline\">.../logs/stream</code> висит со статусом «pending» и типом <code class=\"inline\">eventsource</code> (в Chrome можно отфильтровать кнопкой «EventStream»/«ES»). Кликни на него — внутри есть вкладка **EventStream**, где видны прилетающие сообщения по одному. Если смотреть только на «водопад» запросов, выглядит как будто ничего не происходит — вся жизнь внутри одного соединения.</p><p>Практические следствия этой архитектуры, которые мы уже зафиксировали в этой сессии: таких соединений браузер на HTTP/1.1 даёт максимум ~6 на домен (та самая история с «6-я вкладка не работает» — в проде лечится HTTP/2 на ingress), на сервере на них стоит лимит 10 стримов на аккаунт (<code class=\"inline\">logStreamLimiter</code>), а тот же транспорт (<code class=\"inline\">/events</code>) используется для push-инвалидаций кэша дашборда.</p>",
+    "ts": "2026-07-11T19:45:29.413Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>поехали по плану OVH адаптер</p>",
+    "ts": "2026-07-11T19:49:15.775Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Поехали. Порядок — по плану: сначала задача 0 (два фикса), потом адаптер. Веду задачи списком.</p>",
+    "ts": "2026-07-11T19:49:25.831Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Пишу фикс №1. Сначала проверю имя поля Region-сервиса в govultr-клиенте:</p>",
+    "ts": "2026-07-11T19:49:50.802Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сам фикс wiring&#x27;а в main.go и тест на гард:</p>",
+    "ts": "2026-07-11T19:50:10.748Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба SDK поддерживают Labels в create-запросе node pool. Добавляю общую константу и прокидываю её в оба адаптера:</p>",
+    "ts": "2026-07-11T20:02:21.838Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>SDK изучен: контекстные методы есть, конструктор — 4 ключа. Пишу адаптер:</p>",
+    "ts": "2026-07-11T20:04:12.075Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тесты адаптера на фейковом <code class=\"inline\">ovhAPI</code>:</p>",
+    "ts": "2026-07-11T20:04:50.617Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тесты зелёные. Wiring в main.go — смотрю env-блок:</p>",
+    "ts": "2026-07-11T20:05:44.702Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — переменные ещё не используются. Добавляю блок регистрации адаптера:</p>",
+    "ts": "2026-07-11T20:06:02.438Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Сборка чистая. Проверяю admin-форму на автоподхват нового облака:</p>",
+    "ts": "2026-07-11T20:07:46.920Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — все задачи этапа, кроме живого прогона, выполнены. Сборка, <code class=\"inline\">go vet</code>, gofmt и все тесты зелёные.</p><p>**Что сделано:**</p><p>**Два до-OVH&#x27;ных фикса** (задача 0 плана):<br>- <code class=\"inline\">VultrAdapter.Regions</code> теперь заполняется в [main.go](cmd/coordinator/main.go) + гард в <code class=\"inline\">ListRegions</code>, переводящий будущую ошибку wiring&#x27;а из паники в обычную ошибку (паника убивала бы <code class=\"inline\">GET /admin/clouds</code> целиком, best-effort ловит только error) + тест.<br>- Node pool&#x27;ы DO и Vultr теперь создаются с лейблом <code class=\"inline\">coordinator.dev/tariff=free</code> (общая <code class=\"inline\">provisioning.NodeTariffLabels</code> в [cloud.go](internal/coordinator/provisioning/cloud.go)) — до этого на реально спровиженном облачном кластере все поды Fleet&#x27;ов повисли бы в Pending. Тесты ассертят лейбл в create-запросах.</p><p>**OVH-адаптер** ([ovhadapter.go](internal/coordinator/provisioning/ovhadapter.go)):<br>- go-ovh — generic-клиент, поэтому DTO свои; create — два вызова (кластер → nodepool с tariff-лейблом через <code class=\"inline\">template.metadata.labels</code>), причём при фейле nodepool свежий кластер **откатывается** — чтобы не биллился полукластер, неспособный шедулить Fleet&#x27;ы; kubeconfig — POST с распаковкой <code class=\"inline\">{content}</code>; регионы — capabilities-эндпоинт (только MKS-capable).<br>- 11 тестов на фейке generic-клиента ([ovhadapter_test.go](internal/coordinator/provisioning/ovhadapter_test.go)) — включая rollback, omitempty версии и маппинг всех статусов.<br>- Wiring: пять env (<code class=\"inline\">OVH_ENDPOINT</code> дефолт <code class=\"inline\">ovh-eu</code>, три ключа, <code class=\"inline\">OVH_CLOUD_PROJECT</code>) — всё-или-ничего: частичная конфигурация валит старт с перечислением недостающих переменных, а не молча выключает облако. Flavor по умолчанию <code class=\"inline\">d2-4</code>.<br>- Admin-форма правок не потребовала — дропдаун облаков строится из <code class=\"inline\">GET /admin/clouds</code> динамически, проверил по коду <code class=\"inline\">ClustersPage.tsx</code>.</p><p>**Документация:** PROJECT_MAP (чеклист п.6, этапы, шаг 8 — с описанием обоих багов и мотивации выбора OVH), CLAUDE.md (грабли go-ovh рядом с govultr), WHATIF (п.4 DDoS-плана переведён в 🟡). План-файл удалён.</p><p>**Остаток этапа — задача 5, живой прогон, заблокирован на тебе:** нужен OVH-аккаунт (endpoint <code class=\"inline\">ovh-eu</code>), Public Cloud проект и API-ключи. На прогоне первым делом проверяем три невалидированных допущения: маппинг статусов <code class=\"inline\">READY</code>/<code class=\"inline\">ERROR</code>, создание nodepool при кластере в <code class=\"inline\">INSTALLING</code>, и — главный мотив всей затеи — что VAC-защита реально покрывает UDP hostPort-диапазон нод. Всё это записано в ⚠️-пункт PROJECT_MAP.</p>",
+    "ts": "2026-07-11T20:11:06.231Z"
   }
 ]
