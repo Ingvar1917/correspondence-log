@@ -10667,5 +10667,17 @@
     "who": "claude",
     "html": "<p>Скобки поехали — переписываю блок целиком:</p>",
     "ts": "2026-07-11T15:24:13.810Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Причина пустого селекта: дашборд спрашивает <code class=\"inline\">GET /dashboard/regions</code> у бэкенда, в котором этого роута ещё нет — coordinator, в который смотрит твой UI, собран до этой правки. Запрос падает 404, а компонент (моя вина) молча глотал ошибку и рисовал пустой селект. Честно-пустой список (<code class=\"inline\">[]</code>) выглядел бы иначе — подсказкой «No regions available yet».</p><p>Что сделал:</p><p>- [RegionsSection.tsx](dashboardui/src/features/settings/RegionsSection.tsx) теперь различает три состояния: ошибка запроса → красный текст «Failed to load available regions: …» (форма не рисуется), пустой список → подсказка «нет активных кластеров», список есть → селект. Пока идёт загрузка — ничего, вместо пустого обманчивого селекта.<br>- Тест на этот кейс (404 от старого бэкенда → видимая ошибка, формы нет). Все 78 зелёные, tsc чистый.</p><p>Чтобы у тебя заработало: перезапусти coordinator. Для <code class=\"inline\">make dev-stack</code> достаточно перезапуска (локальный бинарь пересоберётся, и он же применит миграцию 000034). Если смотришь на in-cluster <code class=\"inline\">deployment/app</code> — его образ надо пересобрать, иначе после миграции от локального бинаря он ещё и крашнется на «no migration found for version 34» — та самая грабля из WHATIF от 2026-07-08 (<code class=\"inline\">docker build -t coordinator-app:dev . &amp;&amp; kind load docker-image coordinator-app:dev --name coordinator-dev &amp;&amp; kubectl -n coordinator rollout restart deployment/app</code>).</p><p>И проверь после рестарта: если в dev у тебя нет ни одного <code class=\"inline\">active</code>-кластера в <code class=\"inline\">cluster_registry</code>, ты увидишь «No regions available yet» — тогда либо <code class=\"inline\">make dev-up</code>-бутстрап (он регистрирует свой кластер), либо провижининг региона через Admin UI (<code class=\"inline\">dev-stack</code> включает kind-провижининг).</p>",
+    "ts": "2026-07-11T15:26:04.131Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>там сейчас asia и dev, а должно быть только asia dev ведь кластер нашей инфраструктуры, или в проде будет только asia&amp;</p>",
+    "ts": "2026-07-11T15:27:31.305Z"
   }
 ]
