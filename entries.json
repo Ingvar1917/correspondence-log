@@ -11279,5 +11279,23 @@
     "who": "claude",
     "html": "<p>Готово. Три добавления одним заходом:</p><p>**Player count по инстансу** — тот же лейбл <code class=\"inline\">agones.dev/sdk-player-count</code>, который уже читает <code class=\"inline\">metrics.Collector</code> для агрегатов, теперь читается и в <code class=\"inline\">FleetStatus</code> per-instance (<code class=\"inline\">agones.GameServerStatus.PlayersConnected *int</code>). Соблюдена та же тонкость nil-vs-present-zero, что уже была в <code class=\"inline\">metrics.Snapshot</code>: игра, ни разу не позвавшая <code class=\"inline\">/v1/players/*</code>, не покажет обманчивые «0 players» — поле просто отсутствует. В строке инстанса — «players: N».</p><p>**Агрегат «IN MATCH» исправлен на клиенте** — по твоему замечанию, он раньше был мёртвым числом для ровно того сценария, что ты тестируешь: <code class=\"inline\">sim: start</code> никого не аллоцирует (это чисто лейбл), поэтому <code class=\"inline\">allocated_replicas</code> с бэкенда всегда оставался 0, даже когда строка инстанса уже показывала «match started». Теперь виджет сам считает: инстанс попадает в «in match», если он либо реально <code class=\"inline\">Allocated</code>, либо у него <code class=\"inline\">match_started</code> — без двойного счёта. Бэкенд не тронут, это чисто презентационное решение; добавлен тест, который явно проверяет именно это (бэкенд честно шлёт <code class=\"inline\">allocated_replicas: 0</code>, а виджет всё равно показывает 1).</p><p>Все тесты зелёные: полный <code class=\"inline\">go test ./...</code> (exit 0), 85/85 vitest, gofmt чист. Доки (PROJECT_MAP/INDIE_UI_MAP) обновлены.</p>",
     "ts": "2026-07-11T18:09:52.444Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>https://www.i3d.net/gaming-industry/<br>это наш конкурент?</p>",
+    "ts": "2026-07-11T18:13:29.601Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прямой доступ к странице заблокирован (403) — поищу информацию о i3D.net из вторичных источников.</p>",
+    "ts": "2026-07-11T18:13:49.895Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Отчасти — по категории продукта да, но по сегменту и модели выхода на рынок это скорее сосед, чем прямой конкурент за твоего клиента на входе.</p><p>**i3D.net** — 20+ лет на рынке, история с AAA (Ubisoft, EA, Rocket League), владеет физической инфраструктурой: свои bare metal серверы, приватная сеть на 60+ точек присутствия, фирменная защита от DDoS (GLAD) и анти-чит (FairFight). Их «оркестратор» — гибрид bare metal (стабильная нагрузка) + облако разных провайдеров (AWS/GCP/Azure/Tencent) для пиков. Даже их инди-кейс (Alta) читается как миграционный проект с интеграцией, а не самостоятельная регистрация в дашборде.</p><p>**Мы** — по позиционированию из PROJECT_MAP это явно другой сегмент: self-serve, бесплатный тариф, регистрация → аплоад билда → готово, без единого разговора с продажником и без знания Kubernetes. Инфраструктура — управляемые облака (DO), никакого своего железа, и это осознанное решение, не временный компромисс.</p><p>Так что на входе (свободный тариф, первая игра, ноль инфраструктурных знаний) i3D.net тебе не соперник — там просто нет такого клиента. Настоящие прямые конкуренты по этой нише — Hathora, Edgegap, Unity Multiplay, GameLift. Интереснее другое: i3D.net закрывает ровно то, чего у нас пока нет вообще — DDoS-защиту и анти-чит. Это прямая рифма к сегодняшней записи в WHATIF про DDoS-слепую зону: если наш индюк вырастет и получит реальную атаку, i3D.net — ровно то место, куда он уйдёт «выпускником». В этом смысле это не конкурент за нового пользователя, а конкурент за удержание успешного.</p><p>Sources:<br>- [Gaming Industry Hosting | i3D.net](https://www.i3d.net/solutions/gaming-industry/)<br>- [i3D.net&#x27;s game server orchestrator](https://www.i3d.net/i3dnet-orchestrator-game-server/)<br>- [Game Server Orchestrator | i3D.net](https://www.i3d.net/game-server-orchestrator/)<br>- [Scaling Game Server Infrastructure with i3D.net&#x27;s Bare Metal Cloud | Ubisoft](https://www.i3d.net/customer-stories/ubisoft/)<br>- [30% Lower compute costs | Alta](https://www.i3d.net/customer-stories/alta/)</p>",
+    "ts": "2026-07-11T18:15:16.422Z"
   }
 ]
