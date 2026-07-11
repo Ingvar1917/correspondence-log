@@ -10349,5 +10349,17 @@
     "who": "ihar",
     "html": "<p>помечай</p>",
     "ts": "2026-07-11T13:27:50.953Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Помечено:</p><p>- [WHATIF.md](WHATIF.md) — строка «сервер индюка плодит зомби-процессы»: что уже закрыто exec-обёрткой (с указателем на <code class=\"inline\">launcher.go:166-171</code>), узкий остаток (launch_command-скрипты, чужие сироты), почему blast radius — вся нода (managed-провайдеры не дают <code class=\"inline\">podPidsLimit</code>), решение tini ⬜, отклонённый <code class=\"inline\">shareProcessNamespace</code> со ссылкой на hardening-строку.<br>- [PROJECT_MAP.md](PROJECT_MAP.md) — tini добавлен третьим пунктом в ⬜ «Hardening пода игры» (п.2) с меткой «при следующем касании build-пайплайна».</p><p>Clock drift — выброшен молча, как договорились: премисса неверна, а его реальный родственник (CPU throttling) уже был помечен в п.7.</p>",
+    "ts": "2026-07-11T13:28:55.478Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделал коммит</p>",
+    "ts": "2026-07-11T13:29:53.621Z"
   }
 ]
