@@ -11147,5 +11147,29 @@
     "who": "claude",
     "html": "<p>Полный <code class=\"inline\">go test ./...</code> зелёный (exit 0), gofmt чист. UI уже проверен (83/83, tsc чист). Готово:</p><p>**Что добавлено — два новых, независимых сигнала в контракте bridge-sidecar:**</p><p>1. **<code class=\"inline\">POST /v1/ready</code>** — явное «я реально готов принимать игроков», закрывает риск №4 из карты («порт открыт ≠ сервер готов»). Гонится наравне с TCP-детектом порта в <code class=\"inline\">waitUntilUp</code> через новый канал <code class=\"inline\">readySignal</code> (тот же паттерн nil-disables-path, что у существующего <code class=\"inline\">closeSignal</code>) — какой бы сигнал ни сработал первым, тот и решает. Игре не обязательно вообще открывать порт, если она явно зовёт <code class=\"inline\">/v1/ready</code>.</p><p>2. **<code class=\"inline\">POST /v1/start</code>** — по твоему уточнению, отдельная вещь: «лобби/раунд в игре реально начался». Это чисто наблюдательный лейбл (<code class=\"inline\">match-started</code>, once-guarded — как и close, но без канала: тут нет control-flow, который его ждёт), не завязан ни на какую бизнес-логику coordinator&#x27;а. Существует ровно для Кейса 3 (<code class=\"inline\">lobby_mode=server</code>) — там старт раунда решает сам сервер индюка, а не наша session-логика, и раньше у нас не было способа это увидеть.</p><p>**Видимый эффект в дашборде**: у Allocated-инстанса теперь бейдж «match started» (зелёный, рядом с <code class=\"inline\">ip:port</code>), появляется после вызова <code class=\"inline\">/v1/start</code>. Новая dev-кнопка **<code class=\"inline\">sim: start</code>** (первая в ряду, перед join/leave/end match) дёргает её через тот же exec-путь, что и остальные три.</p><p>**Почему нет кнопки <code class=\"inline\">sim: ready</code>**: <code class=\"inline\">/v1/ready</code> управляет самим моментом вызова <code class=\"inline\">Ready()</code> — в деве наш тестовый gamebase открывает порт почти мгновенно, так что реального окна для демонстрации эффекта почти нет, а сама механика уже покрыта юнит-тестом (<code class=\"inline\">TestRun_ReadySignalTriggersReadyIndependentlyOfPort</code>, порт никогда не открывается — но <code class=\"inline\">Ready()</code> всё равно срабатывает по явному сигналу). Если понадобится кнопка и для него — добавить тривиально, шепни.</p><p>**Тесты**: control loop (readySignal побеждает не поднявшийся порт), оба HTTP-хендлера (idempotent close-once), чтение лейбла в <code class=\"inline\">FleetStatus</code> (есть/нет), полный HTTP-путь на все четыре команды через dashboardapi, UI (кнопка шлёт правильный <code class=\"inline\">command</code>, бейдж рисуется по <code class=\"inline\">match_started</code>).</p>",
     "ts": "2026-07-11T17:48:15.187Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>sim:start</p><p>2026/07/11 19:49:16 [dashboardapi] internal error: exec in pod 34af2ec0-a5f6-4709-a21d-19c84d32fe95-njf4j-2pxjr: command terminated with exit code 1 (stderr: wget: server returned error: HTTP/1.1 404 Not Found</p>",
+    "ts": "2026-07-11T17:49:30.017Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это ожидаемо и не баг: <code class=\"inline\">wget</code> реально дошёл до bridge-sidecar в поде и получил честный 404 — значит **бинарь bridge-sidecar в контейнере старый**, собранный до сегодняшних правок, и <code class=\"inline\">/v1/start</code> в нём физически ещё нет. Это тот же класс проблемы, что уже был зафиксирован в WHATIF («новая миграция, а in-cluster образ не пересобран») — только для образа <code class=\"inline\">bridge-sidecar:dev</code>, а не самого coordinator&#x27;а.</p>",
+    "ts": "2026-07-11T17:49:47.411Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Точный путь для перезагрузки образа:</p><pre><code>docker build -q -t bridge-sidecar:dev -f Dockerfile.bridge-sidecar . &amp;&amp; \\\nkind load docker-image bridge-sidecar:dev --name coordinator-dev\n</code></pre><p>Этого достаточно **пересобрать образ и загрузить в узел** — <code class=\"inline\">bridge-sidecar</code> берётся из образа <code class=\"inline\">Command</code>/<code class=\"inline\">Image</code> в Fleet-спеке, а не из процесса coordinator&#x27;а, поэтому перезапуск dev-stack тут ни при чём. Дальше нужно, чтобы Fleet пересоздал под с новым образом:</p><pre><code># перезапусти инстанс, чтобы Agones подхватил свежий образ bridge-sidecar\n</code></pre><p>Проще всего — через уже существующую кнопку **Restart** на живой сессии (или Stop → Launch игры заново на Overview), это форсирует <code class=\"inline\">DeleteGameServer</code>/пересоздание пода из Fleet-шаблона с текущим <code class=\"inline\">bridge-sidecar:dev</code>.</p><p>Хочу зафиксировать это как строку в WHATIF — это тот же класс граблей, что уже описан для образа coordinator&#x27;а (протухший in-cluster образ после кодовых изменений), просто для другого артефакта:</p>",
+    "ts": "2026-07-11T17:50:04.159Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Сделай так:</p><pre><code>docker build -q -t bridge-sidecar:dev -f Dockerfile.bridge-sidecar .\nkind load docker-image bridge-sidecar:dev --name coordinator-dev\n</code></pre><p>а затем пересоздай под игры (Restart на сессии, либо Stop → Launch на Overview) — и <code class=\"inline\">sim: start</code> должен заработать. Строку про эту грабли занёс в WHATIF, она в точности зеркалит уже известную с образом coordinator&#x27;а/миграциями, просто для отдельно собираемого <code class=\"inline\">bridge-sidecar:dev</code>.</p>",
+    "ts": "2026-07-11T17:50:26.207Z"
   }
 ]
