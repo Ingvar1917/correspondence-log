@@ -11813,5 +11813,17 @@
     "who": "ihar",
     "html": "<p>делай</p>",
     "ts": "2026-07-11T21:00:27.208Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Deploy-job добавлен в [ci.yml](.github/workflows/ci.yml), YAML провалидирован (включая позицию heredoc-терминатора — проверил скриптом).</p><p>Как это работает:</p><p>- **Гейт — весь зелёный CI**, не только сборка образов: <code class=\"inline\">needs: [test, dashboardui, e2e-agones, build-push]</code>. Деплоится только коммит, прошедший go-тесты, оба UI и живой e2e против Agones.<br>- **На дроплете**: <code class=\"inline\">git pull</code> клона (compose-файлы/Caddyfile из того же коммита — сегодняшний autoheal доехал бы именно так) → пин <code class=\"inline\">COORDINATOR_IMAGE=ghcr.io/…:&lt;sha&gt;</code> персистится в <code class=\"inline\">.env</code> (ручной <code class=\"inline\">up -d</code> завтра поднимет тот же sha, а не внезапный <code class=\"inline\">:latest</code>; **откат = re-run workflow старого коммита**) → <code class=\"inline\">pull &amp;&amp; up -d</code> → **health-gate**: job ждёт <code class=\"inline\">healthy</code> по нашему свежему <code class=\"inline\">/healthz</code> до двух минут и падает с логами контейнера, если новый образ плох — деплой не «выкатил и убежал».<br>- **Без секретов — молчаливый skip** с пояснением в логе (тот же паттерн, что <code class=\"inline\">test-e2e-cloud-*</code>): пока ты не заведёшь ключи, ничего не меняется, образы в ghcr публикуются как раньше.</p><p>По ходу поймал и починил собственный баг до того, как он выстрелил: дефолтный путь содержал <code class=\"inline\">~</code>, которая уезжала на дроплет литералом в кавычках и не раскрывалась — заменил на путь относительно home ssh-пользователя (<code class=\"inline\">coordinator/deploy/prod</code>).</p><p>Документация: README шаг 10 теперь описывает автодеплой + секреты + ручной fallback, PROJECT_MAP п.8 — «CD: дроплет-режим ✅, k8s-режим ⬜» с пометкой, что дроплет-job умирает естественной смертью при переезде на системный кластер.</p><p>**Что нужно от тебя, чтобы включить** (Settings → Secrets and variables → Actions): <code class=\"inline\">DROPLET_HOST</code>, <code class=\"inline\">DROPLET_SSH_KEY</code> (заведи отдельный deploy-ключ, не личный), опционально <code class=\"inline\">DROPLET_SSH_USER</code> (дефолт root) и Variable <code class=\"inline\">DROPLET_COMPOSE_DIR</code>, если клон не в <code class=\"inline\">~/coordinator</code>. Предупреждения IDE «Context access might be invalid» — ровно про то, что этих секретов ещё нет, исчезнут после заведения.</p><p>Один честный ⬜: сам job до первого реального дроплета не прогонялся — синтаксис и логика проверены, но SSH-путь живьём подтвердит только первый деплой (если что-то не так — job красный с внятным местом падения, прод при этом не трогается до стадии <code class=\"inline\">up -d</code>).</p>",
+    "ts": "2026-07-11T21:04:00.848Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>когда образ координатора попадает в ghcr?</p>",
+    "ts": "2026-07-11T21:04:23.508Z"
   }
 ]
