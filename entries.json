@@ -11783,5 +11783,11 @@
     "who": "claude",
     "html": "<p>Готово, всё зелёное. Что сделано:</p><p>1. **<code class=\"inline\">/healthz</code> с DB-ping** — [healthzHandler](cmd/coordinator/main.go) на host-less пути рядом с <code class=\"inline\">/metrics</code>: ping Postgres с таймаутом 2с (проба не должна зависать вместе с тем, что проверяет), при недоступной БД — 503. Тест на контракт деградации в [main_test.go](cmd/coordinator/main_test.go) — pgx коннектится лениво, так что 503-путь проверяется без Postgres мгновенным connection refused; здоровый 200-путь юнитом не проверить, его покроет живой стенд.</p><p>2. **[app.yaml](deploy/local/app.yaml)**: <code class=\"inline\">strategy: Recreate</code> (с комментарием, почему дефолтный RollingUpdate для нас — воспроизводимый инцидент задвоения записей) + readiness (быстрая: 5с/2 фейла — убирает под из Service, пока БД мигает) и liveness (щадящая: 15с/4 фейла — рестарт лечит зависший процесс, но не умершую БД, частить незачем).</p><p>3. **WHATIF** — новая строка «инстанс coordinator&#x27;а умер/завис целиком — кто поднимет новый?» с полной картиной: что гарантирует Deployment, почему матчи не страдают, три закрытые сегодня дырки, и честные остатки — ⬜ «kubelet рестартит по failing liveness» живьём не провоцировалось, а единственный настоящий SPOF теперь Postgres (managed с HA — требование системного кластера).</p><p>Одно предупреждение на будущее, из нашей же граблиной коллекции: **пробы попадут в dev-кластер раньше, чем ручка** — in-cluster образ <code class=\"inline\">coordinator-app:dev</code> собран до <code class=\"inline\">/healthz</code>, и если применить обновлённый app.yaml к старому образу, под уйдёт в рестарт-луп по failing probes (та же механика, что со stale bridge-sidecar). Порядок при следующем обновлении дев-стенда: сначала пересобрать образ + <code class=\"inline\">kind load</code>, потом <code class=\"inline\">kubectl apply</code> — либо просто полный <code class=\"inline\">make dev-down &amp;&amp; dev-up</code>, он делает всё в правильном порядке.</p>",
     "ts": "2026-07-11T20:33:17.433Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>я ведь спрашивал про прод режим</p>",
+    "ts": "2026-07-11T20:33:43.390Z"
   }
 ]
