@@ -10739,5 +10739,53 @@
     "who": "claude",
     "html": "<p>Тест-панель — тот же словарь (сырой стейт в title для саппорта):</p>",
     "ts": "2026-07-11T15:36:32.120Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Мэппинг живёт одним модулем [serverState.ts](dashboardui/src/lib/serverState.ts) и используется обоими виджетами (deploy-статус и тест-панель). Логика:</p><p>**Стадии вместо технологий:**</p><p>| Сырое | Индюку | Тон |<br>|---|---|---|<br>| <code class=\"inline\">PodInitializing</code>, <code class=\"inline\">ContainerCreating</code>, <code class=\"inline\">Scheduled</code>, <code class=\"inline\">RequestReady</code>, <code class=\"inline\">Creating</code>, <code class=\"inline\">Starting</code>, <code class=\"inline\">PortAllocation</code> | <code class=\"inline\">starting…</code> | серый |<br>| <code class=\"inline\">Ready</code> | <code class=\"inline\">ready</code> | зелёный |<br>| <code class=\"inline\">Allocated</code> | <code class=\"inline\">in match</code> | синий |<br>| <code class=\"inline\">ImagePullBackOff</code>, <code class=\"inline\">ErrImagePull</code>, <code class=\"inline\">InvalidImageName</code>, <code class=\"inline\">ErrImageNeverPull</code> | <code class=\"inline\">image problem</code> + подсказка про билд/реестр | красный |<br>| <code class=\"inline\">CrashLoopBackOff</code> | <code class=\"inline\">crashing on start</code> | красный |<br>| <code class=\"inline\">CreateContainerConfigError/CreateContainerError/RunContainerError</code> | <code class=\"inline\">failed to start</code> | красный |<br>| <code class=\"inline\">Unhealthy</code> | <code class=\"inline\">not responding</code> | красный |<br>| <code class=\"inline\">Shutdown</code> | <code class=\"inline\">shutting down…</code> | серый |<br>| <code class=\"inline\">Gone</code> (наш, тест-инстанс) | <code class=\"inline\">stopped unexpectedly</code> | красный |</p><p>**Три принципа, которые в этом мэппинге важнее списка слов** (записаны в INDIE_UI_MAP):<br>1. **Семантика важнее слова** — «PodInitializing» теперь не только переименован, но и перестал быть красным: это транзитная стадия, а не ошибка. Твоя интуиция на скриншоте была верная в обе стороны.<br>2. **Скрываем слова, не информацию** — у ошибок и *незнакомых* состояний сырая строка (<code class=\"inline\">reason: message</code>) остаётся мелким моно-текстом под пилюлей, в тест-панели — в title. Это первичка для саппорта: вчерашний диагноз по «pull access denied» должен оставаться возможным по скриншоту.<br>3. **Незнакомое — не пугаем**: неизвестный reason рендерится нейтральным «starting…» + сырое рядом, а не красным. False-alarm вреднее недокраски, но полная маскировка скрыла бы проблему — поэтому raw обязателен именно в этой ветке.</p><p>Бэкенд не тронут — DTO продолжает отдавать честные состояния, вся подача в UI-словаре (новый язык переведёт эти же ключи). Тесты: новый кейс в OverviewTab («слова k8s не светятся, ошибки переведены»), обновлённые ассерты, все 79 зелёные, tsc чистый.</p>",
+    "ts": "2026-07-11T15:39:30.409Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>нужно сделать что бы индюк видел список инстасов в регионе и инфу об инстансах(ip:port) так же имел возможность увидеть live logs по каждому</p>",
+    "ts": "2026-07-11T15:41:13.775Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понял: в карточке региона — список инстансов с <code class=\"inline\">ip:port</code> и live-логами каждого (сейчас логи есть только у *сессий*, а Ready-инстанс без сессии недоступен). Смотрю бэкенд-путь логов и deploy-статуса:</p>",
+    "ts": "2026-07-11T15:41:34.022Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Пишу бэкенд. Сначала agones-слой (адрес/порт + определение принадлежности инстанса):</p>",
+    "ts": "2026-07-11T15:42:57.974Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Смотрю существующий тест логов, чтобы дописать в том же стиле:</p>",
+    "ts": "2026-07-11T15:45:43.752Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обобщаю LogDrawer (title + streamUrl вместо session):</p>",
+    "ts": "2026-07-11T15:56:56.525Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Доки:</p>",
+    "ts": "2026-07-11T16:00:47.185Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово: каждая строка инстанса в «Deployment by region» теперь показывает <code class=\"inline\">ip:port</code> и имеет кнопку Logs с live-tail&#x27;ом — включая Ready-инстансы, у которых нет сессии (раньше их логи были недоступны в принципе, live-tail существовал только через <code class=\"inline\">session_id</code>).</p><p>**Бэкенд:**<br>- <code class=\"inline\">FleetStatus</code> отдаёт <code class=\"inline\">Address</code>/<code class=\"inline\">Port</code> каждого GameServer&#x27;а (Agones <code class=\"inline\">Status.Address/Ports</code> — [deploystatus.go](internal/coordinator/agones/deploystatus.go)), DTO — <code class=\"inline\">ip</code>/<code class=\"inline\">port</code> (omitempty, пусты до выдачи hostPort).<br>- Новый эндпоинт <code class=\"inline\">GET /games/{id}/regions/{region}/instances/{instance}/logs/stream</code> — тот же SSE-tail, что у сессий, но по имени GameServer&#x27;а. Ownership строгий: fleet-лейбл инстанса должен равняться gameID (Fleet-имя = ID игры по нашей конвенции) либо это собственный <code class=\"inline\">test-&lt;gameID&gt;</code>; чужой и несуществующий инстанс дают одинаковый 404 — не подтверждаем существование чужих имён.<br>- SSE-насос вынесен в общий <code class=\"inline\">streamLogsSSE</code> — сессионный и инстансовый хендлеры больше не дублируют 40 строк.</p><p>**UI:**<br>- <code class=\"inline\">LogDrawer</code> обобщён (<code class=\"inline\">title</code> + <code class=\"inline\">streamUrl</code>) — один компонент для логов сессии и инстанса.<br>- В строке инстанса: переведённая пилюля состояния (вчерашний <code class=\"inline\">serverState.ts</code>), <code class=\"inline\">ip:port</code> моноширинным, Logs справа.</p><p>**Тесты** (все зелёные: полный go test, 80 vitest): launcher — цепочка ownership (свой fleet-инстанс стримится, тест-инстанс стримится, чужой/несуществующий → <code class=\"inline\">ErrInstanceNotFound</code>, незапущенный регион → region-ошибка); dashboardapi — 200 с SSE-обёрткой для своего, 404 для чужого; UI — ip:port виден, клик Logs в строке деплоя открывает стрим по правильному URL, сессионный тест уточнён (кнопок Logs теперь несколько).</p><p>Карты обновлены (PROJECT_MAP п.4, INDIE_UI_MAP). Известное ограничение фиксирую словами: у инстансов *динамически провижиненных* kind-кластеров логи работать будут, а вот сам инстанс не поднимется — та вчерашняя история про образы, к этой фиче не относится.</p>",
+    "ts": "2026-07-11T16:01:28.153Z"
   }
 ]
