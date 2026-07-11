@@ -10715,5 +10715,29 @@
     "who": "ihar",
     "html": "<p>PodInitializing - может быть индюку не показывать такого рода сообщения которые косвенно указывают на технологии?</p>",
     "ts": "2026-07-11T15:33:01.462Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Согласен наполовину — и это важная половина. Прятать нельзя, а **переводить — нужно**. Разница принципиальная:</p><p>**Почему не прятать.** Когда у индюка что-то не поднимается, сырой reason — единственное, что позволит саппорту (то есть тебе) диагностировать проблему по скриншоту. Мы уже видели это сегодня: <code class=\"inline\">ImagePullBackOff</code> + сырое сообщение containerd мгновенно сказали, что не так. Спрятать = ослепить собственный саппорт. Плюс полная маскировка технологий — иллюзия: ip:port, логи сервера, tar.gz-архивы — индюк всё равно видит технику, вопрос не в секретности, а в **понятности**.</p><p>**Почему переводить.** «PodInitializing» для индюка — шум без смысла, и хуже: выглядит как проблема, хотя это нормальная транзитная стадия старта. Продуктовая подача должна быть на языке жизненного цикла *его сервера*, не нашей инфраструктуры.</p><p>**Рекомендация — двухслойная подача, всё в UI-словаре (бэкенд не трогаем, он обязан отдавать честные данные):**</p><p>1. **Известные состояния → человеческие фразы** через i18n-мэппинг (у нас уже есть паттерн <code class=\"inline\">statusKey</code> в BuildRow):<br>   - <code class=\"inline\">PodInitializing</code>, <code class=\"inline\">ContainerCreating</code> → «Starting…» (нейтрально, без красного)<br>   - <code class=\"inline\">ImagePullBackOff</code>, <code class=\"inline\">ErrImagePull</code> → уже переведено («The image can&#x27;t be pulled…»)<br>   - <code class=\"inline\">CrashLoopBackOff</code> → «The server keeps crashing right after start — check the logs»<br>   - Agones-стейты в тест-панели: <code class=\"inline\">Scheduled</code>/<code class=\"inline\">RequestReady</code> → «Starting…», <code class=\"inline\">Ready</code> → «Ready — connect now», <code class=\"inline\">Unhealthy</code> → «Not responding»<br>2. **Сырая строка остаётся, но вторым слоем** — как раскрываемая деталь (details/tooltip), с подписью вроде «technical details for support». Неизвестный reason → generic «Starting…»/«Something&#x27;s wrong» + сырой в деталях; не пытаемся перечислить все состояния k8s, fallback обязателен.</p><p>Ключевой нюанс: переводить надо **семантику, а не слово**. «PodInitializing» — не ошибка, значит и рендерить его надо не красной пилюлей рядом с ImagePullBackOff, а спокойным серым «Starting…» — сейчас, судя по всему, оба идут одним визуальным каналом «waiting reason», и это вводит в заблуждение сильнее самого слова «Pod».</p><p>Делаю? Это чисто UI-работа: мэппинг в i18n + правка DeployStatusWidget и TestInstancePanel + тесты, бэкенд без изменений.</p>",
+    "ts": "2026-07-11T15:33:36.634Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>да. нужен правильный мэппинг</p>",
+    "ts": "2026-07-11T15:34:08.103Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Смотрю, как сейчас рендерятся состояния в DeployStatusWidget и что показывает бэкенд:</p>",
+    "ts": "2026-07-11T15:34:23.793Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тест-панель — тот же словарь (сырой стейт в title для саппорта):</p>",
+    "ts": "2026-07-11T15:36:32.120Z"
   }
 ]
