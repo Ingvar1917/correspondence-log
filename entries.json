@@ -12401,5 +12401,17 @@
     "who": "claude",
     "html": "<p>Теперь переписываю main.go — только оркестрация:</p>",
     "ts": "2026-07-11T23:41:27.477Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. <code class=\"inline\">run()</code> теперь — **30 строк чистой оркестрации**, читается одним взглядом:</p><pre><code>\nloadConfig → миграции → sql.Open → buildServices → startBackgroundLoops → serveHTTP(mux)\n</code></pre><p>Разбивка по файлам (было: main.go 736 строк, из них run() ~530):</p><p>- **[main.go](cmd/coordinator/main.go) — 143 строки**: док-коммент пакета, <code class=\"inline\">main()</code>, <code class=\"inline\">run()</code>, и три мелочи композиционного корня (<code class=\"inline\">clusterRouterAdapter</code>, <code class=\"inline\">healthzHandler</code>, <code class=\"inline\">stripHostPort</code>).<br>- **[config.go](cmd/coordinator/config.go) — 338 строк**: структура <code class=\"inline\">config</code> (все ~60 env-переменных, сгруппированы по фазам с сохранёнными комментариями-обоснованиями) + <code class=\"inline\">loadConfig()</code> со **всеми** required/all-or-nothing проверками в одном месте + env-хелперы.<br>- **[wiring.go](cmd/coordinator/wiring.go) — 452 строки**: <code class=\"inline\">services</code>-структура и фазы: <code class=\"inline\">buildServices</code> (репозитории/API/bootstrap-кластер), <code class=\"inline\">setupBuildPipeline</code> (оба опциональных слоя билдов), <code class=\"inline\">buildProvisioningClouds</code> (DO/Vultr/OVH/kind), <code class=\"inline\">startBackgroundLoops</code> (per-cluster fanout + глобальные циклы), <code class=\"inline\">buildRootMux</code>, <code class=\"inline\">serveHTTP</code>.</p><p>Рефакторинг механический, поведение сохранено — с **одним** сознательным улучшением: частичная OVH-конфигурация теперь возвращает обычную ошибку старта из <code class=\"inline\">loadConfig</code> (была <code class=\"inline\">log.Fatalf</code> посреди wiring&#x27;а — непоследовательность, которую разбивка сделала очевидной; тексты всех ошибок сохранены дословно, на них стоят тесты).</p><p>Проверено: build, vet, gofmt чисты; тесты <code class=\"inline\">cmd/coordinator</code> зелёные (включая все ассерты текстов ошибок валидации — значит <code class=\"inline\">loadConfig</code> честно эквивалентен старому коду), полный short-прогон зелёный.</p><p>На этом день закрыт. Сводка незакрытых хвостов для следующей сессии: план Units этапа 2 согласован по всем обсуждённым решениям, ждёт двух ответов (движки free-воронки → S/M, цена юнита в USD) и команды «поехали»; OVH e2e ждёт ключей; дев-кластеру при следующем удобном случае нужен один финальный <code class=\"inline\">make dev-down &amp;&amp; make dev-up</code> для перехода на персистентный Postgres (и повторный UPDATE тарифа, если захочешь buffer 1 обратно).</p>",
+    "ts": "2026-07-11T23:44:07.196Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>даже не ожидал что так красиво получится отрефакторить</p>",
+    "ts": "2026-07-11T23:46:22.492Z"
   }
 ]
