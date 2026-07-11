@@ -12371,5 +12371,35 @@
     "who": "claude",
     "html": "<p>Хорошая идея — перевернуть дефолт: данные dev-кластера переживают пересоздание, а обнуление становится явным действием. Смотрю, как сейчас устроен Postgres в kind, чтобы выбрать механику:</p>",
     "ts": "2026-07-11T23:29:37.310Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово, конвенция теперь единая с prod-local. Что сделано:</p><p>- **<code class=\"inline\">make dev-down</code>** — данные переживают по умолчанию; **<code class=\"inline\">make dev-down wipe=1</code>** — полный сброс (<code class=\"inline\">rm -rf .dev-data/postgres</code>), ровно как <code class=\"inline\">prod-local-down wipe=1</code>.<br>- Механика: [kind-cluster.yaml](deploy/local/kind-cluster.yaml) монтирует гитигнорный <code class=\"inline\">./.dev-data/postgres</code> в ноду, [postgres.yaml](deploy/local/postgres.yaml) — hostPath вместо emptyDir; официальный postgres-образ сам инициализирует пустой каталог и переиспользует непустой, миграции при повторном dev-up просто no-op&#x27;нутся по <code class=\"inline\">schema_migrations</code>.<br>- <code class=\"inline\">.gitignore</code> + CLAUDE.md обновлены (строка «данные обнуляются» умерла, теперь наоборот).</p><p>**Два практических предупреждения про переход:**</p><p>1. Изменение kind-конфига активируется только пересозданием кластера — **текущий кластер всё ещё на emptyDir**, и первый <code class=\"inline\">make dev-down &amp;&amp; make dev-up</code> потеряет сегодняшние данные последний раз (включая тариф <code class=\"inline\">0–1</code>, который я правил — скажи после пересоздания, повторю UPDATE одной командой).<br>2. **Не запускай <code class=\"inline\">make dev-up</code> поверх живого старого кластера** до полного пересоздания: идемпотентный apply нового postgres.yaml пересоздаст под с hostPath, но без extraMount&#x27;а старого кластера этот путь окажется внутри контейнера ноды — данные потеряются сейчас, а «персистентность» будет фиктивной до настоящего <code class=\"inline\">dev-down &amp;&amp; dev-up</code>. Правильный порядок ровно один: <code class=\"inline\">make dev-down &amp;&amp; make dev-up</code> (когда удобно — спешки нет, текущий стенд работает как работал).</p>",
+    "ts": "2026-07-11T23:32:30.295Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>и последнее на сегодня, тебе не кажется что основной main.go стал перегружен, нужно разбить на функции, что бы код функции run мог уместиться в 1-2 экрана?</p>",
+    "ts": "2026-07-11T23:35:25.826Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Да, не кажется — так и есть: <code class=\"inline\">run()</code> разросся примерно до пяти сотен строк, это давно не «функция», а свиток. Гляну структуру, чтобы разбить по естественным швам, а не по линейке:</p>",
+    "ts": "2026-07-11T23:35:47.308Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё ясно. Пишу <code class=\"inline\">config.go</code>:</p>",
+    "ts": "2026-07-11T23:38:11.077Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь переписываю main.go — только оркестрация:</p>",
+    "ts": "2026-07-11T23:41:27.477Z"
   }
 ]
