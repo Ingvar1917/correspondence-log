@@ -10643,5 +10643,29 @@
     "who": "claude",
     "html": "<p>Всё зелёное. Обновляю карты:</p>",
     "ts": "2026-07-11T15:20:48.025Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Свободный текст заменён на честный селект, дыра закрыта по всей цепочке:</p><p>**Бэкенд**<br>- <code class=\"inline\">clusterregistry.ListActiveRegions</code> — distinct-регионы, где есть хотя бы один <code class=\"inline\">active</code>-кластер ([repository.go](internal/coordinator/clusterregistry/repository.go)).<br>- <code class=\"inline\">GET /dashboard/regions</code> — новый эндпоинт ([handlers.go](internal/coordinator/dashboardapi/handlers.go), auth как у <code class=\"inline\">/tariffs</code>); Server получил зависимость <code class=\"inline\">clusterregistry.Repository</code> (main.go + тестовый setupEnv).<br>- Тест: <code class=\"inline\">TestListAvailableRegions_OnlyActiveDistinct</code> — active попадают, draining/deleted нет, дубли региона схлопываются, без auth 401.</p><p>**UI ([RegionsSection.tsx](dashboardui/src/features/settings/RegionsSection.tsx))**<br>- Вместо инпута — <code class=\"inline\">&lt;select&gt;</code> из <code class=\"inline\">[&#x27;available-regions&#x27;]</code>; если регионов нет вовсе (админ ещё ничего не провижинил) — вместо формы подсказка «No regions available yet». Кнопка Add задизейблена без выбора.<br>- Тесты обновлены + новый на пустой список; все 77 зелёные, tsc чистый, go-тесты dashboardapi/clusterregistry ok.</p><p>**Карты**: INDIE_UI_MAP (строка реестра <code class=\"inline\">[&#x27;available-regions&#x27;]</code> + правка описания Settings), PROJECT_MAP п.4 (регион — только из списка живых; кластер индюку не виден никогда, маппинг делает Router).</p><p>Одно осознанное решение, зафиксирую словами: **сам API (<code class=\"inline\">PUT /games/{id}/regions/{region}</code>) по-прежнему принимает любую строку** — валидация «регион существует» осталась на уровне UI-выбора, а реальность проверяется при launch. Это намеренно: конфиг региона — декларативная запись, и жёсткая проверка на PUT создала бы обратную проблему (нельзя восстановить конфиг, пока кластер региона временно пересоздаётся). Если хочешь жёсткий вариант — это одна проверка в <code class=\"inline\">handleUpsertRegion</code>, но я бы оставил как есть.</p>",
+    "ts": "2026-07-11T15:21:40.398Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>почему сейчас пустой селект?</p>",
+    "ts": "2026-07-11T15:23:17.308Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Скорее всего потому, что бэкенд, в который смотрит твой дашборд, ещё старый — без роута <code class=\"inline\">GET /regions</code> (локальный бинарь <code class=\"inline\">dev-stack</code> надо перезапустить, in-cluster <code class=\"inline\">app</code> — пересобрать образ). Запрос падает 404 → у query состояние error… и тут виноват уже я: компонент молча глотает ошибку этого запроса и рисует пустой селект. Если бы список был честно пустой (<code class=\"inline\">[]</code>), ты бы видел подсказку «No regions available yet» — пустой селект возможен только при ошибке или незавершённой загрузке. Чиню отображение ошибки:</p>",
+    "ts": "2026-07-11T15:23:55.020Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Скобки поехали — переписываю блок целиком:</p>",
+    "ts": "2026-07-11T15:24:13.810Z"
   }
 ]
