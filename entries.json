@@ -11201,5 +11201,83 @@
     "who": "ihar",
     "html": "<p>понял, круто</p>",
     "ts": "2026-07-11T17:57:29.528Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Отлично. Если решишь позже добавить кнопку <code class=\"inline\">sim: ready</code> или довести до автоматического rolling-update bridge-sidecar на живых Fleet&#x27;ах (риск №8) — обе задачи мне уже понятны по контексту, можно браться в любой момент.</p>",
+    "ts": "2026-07-11T17:57:34.137Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>для каждого инстанса должно выводиться текущее количество игроков</p>",
+    "ts": "2026-07-11T18:01:45.677Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Смотрю, как уже читается лейбл <code class=\"inline\">player-count</code> в metrics-коллекторе — там есть тонкость с различением «не участвовал» и «действительно ноль», её нужно повторить и здесь.</p>",
+    "ts": "2026-07-11T18:01:54.878Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь парсинг лейбла в <code class=\"inline\">FleetStatus</code> — нужен <code class=\"inline\">strconv.Atoi</code>:</p>",
+    "ts": "2026-07-11T18:02:52.405Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тесты для агонес-слоя (nil vs present-zero, invalid value):</p>",
+    "ts": "2026-07-11T18:03:21.203Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь DTO:</p>",
+    "ts": "2026-07-11T18:03:45.713Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь UI: тип, отображение в строке инстанса, i18n:</p>",
+    "ts": "2026-07-11T18:04:21.729Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понял — сейчас «IN MATCH» в шапке берётся из <code class=\"inline\">allocated_replicas</code> (реальная Agones-аллокация), а sim-кнопки её не трогают вообще, поэтому число замирает на 0, хотя строка ниже уже показывает бейдж «match started». Расширяю подсчёт клиентской стороной: инстанс считается «in match», если он либо реально <code class=\"inline\">Allocated</code>, либо у него <code class=\"inline\">match_started</code> — без двойного счёта, бэкенд не трогаю.</p>",
+    "ts": "2026-07-11T18:05:59.073Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, ничего не сломалось. Добавляю тест, доказывающий именно расширённое определение (allocated_replicas=0 в фикстуре, а <code class=\"inline\">match_started</code> двигает счётчик):</p>",
+    "ts": "2026-07-11T18:06:36.935Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">deploy.playersConnected</code> ещё не добавлен в словарь — исправляю, заодно поправляю регистр текста в тесте (CSS-uppercase, не реальный текст):</p>",
+    "ts": "2026-07-11T18:07:14.324Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полный прогон бэкенда и финальный контроль:</p>",
+    "ts": "2026-07-11T18:07:49.732Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Обновляю доки одной строкой:</p>",
+    "ts": "2026-07-11T18:09:27.037Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Три добавления одним заходом:</p><p>**Player count по инстансу** — тот же лейбл <code class=\"inline\">agones.dev/sdk-player-count</code>, который уже читает <code class=\"inline\">metrics.Collector</code> для агрегатов, теперь читается и в <code class=\"inline\">FleetStatus</code> per-instance (<code class=\"inline\">agones.GameServerStatus.PlayersConnected *int</code>). Соблюдена та же тонкость nil-vs-present-zero, что уже была в <code class=\"inline\">metrics.Snapshot</code>: игра, ни разу не позвавшая <code class=\"inline\">/v1/players/*</code>, не покажет обманчивые «0 players» — поле просто отсутствует. В строке инстанса — «players: N».</p><p>**Агрегат «IN MATCH» исправлен на клиенте** — по твоему замечанию, он раньше был мёртвым числом для ровно того сценария, что ты тестируешь: <code class=\"inline\">sim: start</code> никого не аллоцирует (это чисто лейбл), поэтому <code class=\"inline\">allocated_replicas</code> с бэкенда всегда оставался 0, даже когда строка инстанса уже показывала «match started». Теперь виджет сам считает: инстанс попадает в «in match», если он либо реально <code class=\"inline\">Allocated</code>, либо у него <code class=\"inline\">match_started</code> — без двойного счёта. Бэкенд не тронут, это чисто презентационное решение; добавлен тест, который явно проверяет именно это (бэкенд честно шлёт <code class=\"inline\">allocated_replicas: 0</code>, а виджет всё равно показывает 1).</p><p>Все тесты зелёные: полный <code class=\"inline\">go test ./...</code> (exit 0), 85/85 vitest, gofmt чист. Доки (PROJECT_MAP/INDIE_UI_MAP) обновлены.</p>",
+    "ts": "2026-07-11T18:09:52.444Z"
   }
 ]
