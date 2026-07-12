@@ -14993,5 +14993,137 @@
     "who": "claude",
     "html": "<p>Готово. Итог по всем четырём пунктам запроса:</p><p>**Backend**: новая миграция 000044 — таблица <code class=\"inline\">gameserver_instance_metrics</code> (per-pod-per-tick история, отдельно от «последнего известного значения» на <code class=\"inline\">gameserver_instances</code>) + колонка <code class=\"inline\">match_started</code>. <code class=\"inline\">metrics.Collector</code> теперь на каждом тике и обновляет живое значение (как раньше), и добавляет строку в историю; читает <code class=\"inline\">agones.dev/sdk-match-started</code> лейбл тем же способом, что уже читал player-count. Новый эндпоинт <code class=\"inline\">GET /games/{id}/instances/{pod_name}/metrics?limit=</code>.</p><p>**Frontend**:<br>- **Players** — теперь полноценный график (третий, наравне с CPU/RAM), не только текст.<br>- **Статус матча** — зелёный бейдж «match started» у работающего инстанса, тот же стиль/лейбл, что у карточек Deploy by region.<br>- **Графики** — кнопка «Show chart» у работающего инстанса разворачивает 3 мини-графика (переиспользуют существующий <code class=\"inline\">MetricChart</code>), окно — последние ~60 тиков (~30 мин).<br>- **Live** — поллинг <code class=\"inline\">METRICS_POLL_MS</code> (30с) и на список инстансов, и на развёрнутый график, только пока панель открыта.</p><p>Проверено: <code class=\"inline\">go build/vet/gofmt</code>, полный <code class=\"inline\">go test ./...</code>, <code class=\"inline\">tsc -b</code>, vitest 102/102 — всё зелёное. <code class=\"inline\">INDIE_UI_MAP.md</code> обновлён (реестр API + ключи кэша + описание секции).</p><p>Та же оговорка, что раньше: живой прогон на <code class=\"inline\">make dev-stack</code> не делал — стек поднят вне этой сессии, трону только по вашей команде.</p>",
     "ts": "2026-07-12T22:07:46.890Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>для завершенных инстансов тоже выводим чарты метрик, и фиксим чарт игроков</p>",
+    "ts": "2026-07-12T22:11:06.967Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">metrics.go</code> — <code class=\"inline\">InstanceSnapshot</code> на указатели:</p>",
+    "ts": "2026-07-12T22:17:29.814Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">metrics/collector.go</code> — главный фикс:</p>",
+    "ts": "2026-07-12T22:18:58.661Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь переписываю сам <code class=\"inline\">upsertInstanceSnapshots</code>:</p>",
+    "ts": "2026-07-12T22:19:21.321Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба пакета собираются. Теперь <code class=\"inline\">dashboardapi</code> — <code class=\"inline\">instanceMetricView</code>.</p>",
+    "ts": "2026-07-12T22:19:50.867Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собирается. Теперь <code class=\"inline\">go vet</code> покажет все места в тестах, которые нужно поправить.</p>",
+    "ts": "2026-07-12T22:20:33.497Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">metrics/collector_test.go</code> — обновляю <code class=\"inline\">fakeInstanceStore</code> (два метода) и все места использования.</p>",
+    "ts": "2026-07-12T22:21:36.154Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь фикс <code class=\"inline\">TestCollector_ReadsMatchStartedLabel</code>:</p>",
+    "ts": "2026-07-12T22:22:29.596Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю ключевой регрессионный тест сразу после:</p>",
+    "ts": "2026-07-12T22:22:46.091Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Есть готовые хелперы. Обновляю новые тесты в <code class=\"inline\">repository_test.go</code>:</p>",
+    "ts": "2026-07-12T22:23:18.229Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю на указатели через <code class=\"inline\">ptr64</code>, плюс добавляю кейс с nil cpu/mem (players-only тик) для полноты покрытия:</p>",
+    "ts": "2026-07-12T22:23:31.031Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">dashboardapi/handlers_test.go</code>:</p>",
+    "ts": "2026-07-12T22:23:58.696Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">go vet</code> чист. Прогоняю полный набор Go-тестов.</p>",
+    "ts": "2026-07-12T22:24:36.790Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все Go-тесты зелёные, включая регрессионный тест на найденный баг. Теперь фронтенд.</p>",
+    "ts": "2026-07-12T22:25:30.929Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Сначала типы:</p>",
+    "ts": "2026-07-12T22:25:46.725Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">MonitoringTab.tsx</code> — null-guard для RAM в <code class=\"inline\">InstanceMetricCharts</code> и снятие ограничения <code class=\"inline\">ended_at == null</code> для кнопки/графика:</p>",
+    "ts": "2026-07-12T22:25:58.057Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь переработка блока кнопок — разделяю логи (только для running) и переключатель графика (всегда):</p>",
+    "ts": "2026-07-12T22:26:11.231Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю типы:</p>",
+    "ts": "2026-07-12T22:26:25.015Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто. Теперь обновляю тесты и добавляю новый — «Show chart» доступен для завершённого инстанса.</p>",
+    "ts": "2026-07-12T22:26:32.643Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю тест на завершённый инстанс и тест на players-only тик (nil cpu/mem не ломает CPU/RAM):</p>",
+    "ts": "2026-07-12T22:27:10.197Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогоняю весь набор:</p>",
+    "ts": "2026-07-12T22:27:40.806Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог:</p><p>**Найденный и исправленный баг**: чтение player-count/match-started было ошибочно завязано на наличие данных metrics-server для пода в конкретном тике (<code class=\"inline\">if usage, ok := podUsage[gs.Name]; !ok { continue }</code> пропускал весь под целиком). Оба сигнала — обычные Agones-лейблы, не зависящие от metrics-server (тот же принцип уже соблюдался для агрегатного графика, но был нарушен в per-instance коде). Разделил на два независимых писателя: <code class=\"inline\">UpsertMetrics</code> (только cpu/mem, когда usage известен) и новый <code class=\"inline\">UpsertPlayerState</code> (players/match-started, всегда). История (<code class=\"inline\">gameserver_instance_metrics</code>) теперь допускает тик с известными только players — новая миграция 000045 сняла <code class=\"inline\">NOT NULL</code> с cpu/mem там.</p><p>**Графики для завершённых инстансов**: кнопка «Show chart» и сам блок графиков больше не привязаны к <code class=\"inline\">ended_at == null</code> — доступны для любого инстанса, история в БД не исчезает после завершения.</p><p>Добавлен явный регрессионный тест на найденный баг (<code class=\"inline\">TestCollector_ReadsPlayerCountEvenWithoutMetricsServerUsage</code>) — под без записи в <code class=\"inline\">podUsage</code>, но с лейблом player-count, всё равно долетает до <code class=\"inline\">UpsertPlayerState</code> и до истории.</p><p>Проверено: <code class=\"inline\">go build/vet/gofmt</code>, полный <code class=\"inline\">go test ./...</code>, <code class=\"inline\">tsc -b</code>, vitest 104/104 — всё зелёное.</p><p>Не проверял живьём — та же оговорка про стек, поднятый вне сессии. Учитывая, что именно этот фикс отталкивался от вашего живого скриншота, стоит перепроверить на живом стенде, когда будет удобно.</p>",
+    "ts": "2026-07-12T22:28:41.395Z"
   }
 ]
