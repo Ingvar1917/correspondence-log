@@ -14765,5 +14765,41 @@
     "who": "claude",
     "html": "<p>Готово — все восемь задач выполнены. Итог:</p><p>**Backend**: <code class=\"inline\">instances.Watcher</code> и <code class=\"inline\">metrics.Collector</code> теперь резолвят <code class=\"inline\">game_id</code> с fallback&#x27;ом на паттерн <code class=\"inline\">test-&lt;uuid&gt;</code> (когда <code class=\"inline\">FleetNameLabel</code> отсутствует — ровно случай standalone Test Launch инстансов, которые раньше были полностью невидимы этому пайплайну). <code class=\"inline\">instances.Repository.ListByGame</code> джойнит <code class=\"inline\">cluster_registry</code> за <code class=\"inline\">region</code>, проброшенный до <code class=\"inline\">instanceView</code> (<code class=\"inline\">GET /games/{id}/instances</code>).</p><p>**Frontend**: секция «Инстансы» теперь поллит <code class=\"inline\">METRICS_POLL_MS</code> (те же 30с, что и графики) — CPU/RAM/players у работающих инстансов реально обновляются, а не застывают на моменте открытия страницы. У работающего инстанса с известным <code class=\"inline\">region</code> вместо текста «ещё работает» — кнопка Logs, открывающая уже существующий <code class=\"inline\">LogDrawer</code> (тот же SSE live-tail, что и у деплой-виджета) по URL <code class=\"inline\">.../regions/{region}/instances/{pod_name}/logs/stream</code>.</p><p>Все проверки зелёные: <code class=\"inline\">go build/vet/gofmt</code>, полный <code class=\"inline\">go test ./...</code>, <code class=\"inline\">tsc -b</code>, <code class=\"inline\">vitest</code> (98/98).</p><p>**Не проверено живьём** — та же оговорка, что в прошлый раз: у вас уже поднят <code class=\"inline\">make dev-stack</code> вне этой сессии, я его не трогал. Раз это первая проверка того, что standalone Test Launch инстанс вообще подхватывается новым пайплайном — стоило бы поткнуть живьём (создать Test Launch → увидеть его в «Инстансы» с бейджем running, регионом и рабочей кнопкой Logs), но решать вам: пересобрать/перезапустить стек сам, или сделаете сами.</p>",
     "ts": "2026-07-12T21:35:35.219Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделай статусы инстансов так же как на карточках deployment by region, добавь название региона, добавь значение cpu(сейчас cpu не отображается)</p>",
+    "ts": "2026-07-12T21:40:17.758Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Сначала обновлю <code class=\"inline\">categoryBadge</code>, чтобы переиспользовать <code class=\"inline\">toneClass</code> из <code class=\"inline\">lib/serverState.ts</code>:</p>",
+    "ts": "2026-07-12T21:42:08.648Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю видимое название региона и переработанный, всегда видимый (с fallback «—» для работающих) блок CPU/RAM:</p>",
+    "ts": "2026-07-12T21:42:29.919Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю i18n-ключи <code class=\"inline\">instances.cpu</code>/<code class=\"inline\">instances.ram</code>:</p>",
+    "ts": "2026-07-12T21:42:46.079Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю типы и обновляю существующие тесты под новые лейблы «CPU:»/«RAM:»:</p>",
+    "ts": "2026-07-12T21:42:55.743Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Изменения только фронтовые (<code class=\"inline\">dashboardui</code>), бэкенд не трогал:</p><p>- **Статусы** — бейджи теперь используют те же тона <code class=\"inline\">toneClass</code> (<code class=\"inline\">lib/serverState.ts</code>), что и карточки Deploy by region, а не свой отдельный набор цветов.<br>- **Регион** — виден отдельным чипом в строке инстанса.<br>- **CPU** — теперь всегда отображается для работающих инстансов (лейбл «CPU: 120m»), с «—» вместо молчания, если коллектор ещё не тикнул или metrics-server недоступен — раньше блок целиком пропадал, если значения не было, что и выглядело как «CPU не показывается». RAM получила такой же явный лейбл и fallback.</p><p>Проверено: <code class=\"inline\">tsc -b</code> чисто, vitest 100/100 (добавил тесты на fallback «—» и на видимость региона). <code class=\"inline\">INDIE_UI_MAP.md</code> обновлён.</p>",
+    "ts": "2026-07-12T21:45:13.382Z"
   }
 ]
