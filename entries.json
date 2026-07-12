@@ -16841,5 +16841,23 @@
     "who": "ihar",
     "html": "<p>при make up нужно вывести все доступные для мониторинга ссылки</p>",
     "ts": "2026-07-12T23:37:01.529Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — <code class=\"inline\">make up</code> теперь печатает ссылки на Grafana, Prometheus и страницу таргетов.</p>",
+    "ts": "2026-07-12T23:37:18.754Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>как убедиться что работает?</p>",
+    "ts": "2026-07-12T23:41:26.262Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверил: сама труба работает, панели пустые по другой причине.</p><p>**Что подтверждено:**<br>- Prometheus target <code class=\"inline\">coordinator-dev-stack</code> → <code class=\"inline\">up=1</code>, скрейпит <code class=\"inline\">localhost:18080/metrics</code> каждые 15с — это видно и в <code class=\"inline\">make status</code>, и в <code class=\"inline\">http://localhost:9090/targets</code>.<br>- <code class=\"inline\">/metrics</code> отдаёт валидный Prometheus-формат (<code class=\"inline\">go_*</code>, стандартные раннтайм-метрики есть).</p><p>**Почему &quot;No data&quot; именно на <code class=\"inline\">coordinator_gameserver_*</code>:** эти гейджи (<code class=\"inline\">metrics.Exporter</code>, [exporter.go](internal/coordinator/metrics/exporter.go)) заводятly не при старте процесса, а только когда <code class=\"inline\">metrics.Collector</code> реально пройдёт тик по настоящему <code class=\"inline\">(cluster_id, game_id)</code> — то есть нужен хотя бы один зарегистрированный кластер с запущенной игрой/Fleet&#x27;ом. Сейчас на этом coordinator&#x27;е таких снапшотов ещё не было — это не баг дашборда, метрика физически отсутствует в <code class=\"inline\">/metrics</code>, а не просто равна нулю.</p><p>Как убедиться, что данные пойдут при появлении:</p>",
+    "ts": "2026-07-12T23:42:00.582Z"
   }
 ]
