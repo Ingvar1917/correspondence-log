@@ -16805,5 +16805,29 @@
     "who": "claude",
     "html": "<p><code class=\"inline\">/metrics</code> отдаёт валидный Prometheus-формат, эндпоинт скрейпится. <code class=\"inline\">coordinator_gameserver_*</code> гейджи пока пустые — это ожидаемо: они появляются только когда <code class=\"inline\">metrics.Exporter.Observe</code> реально сработает хотя бы раз (есть игра + кластер с Fleet&#x27;ом), а не с пустого дев-стека. Дашборд в Grafana покажет данные, как только на этом coordinator&#x27;е будет запущена хотя бы одна игра.</p><p>Проверю, что Grafana тоже поднялась и провижининг датасорса/дашборда применился.</p>",
     "ts": "2026-07-12T23:34:13.937Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё работает: датасорс и дашборд подхватились автоматически.</p><p>**Готово.** В <code class=\"inline\">/home/ihar/Games/ludarium/monitoring/</code>:<br>- <code class=\"inline\">docker-compose.yml</code> — Prometheus (<code class=\"inline\">:9090</code>) + Grafana (<code class=\"inline\">:3000</code>, <code class=\"inline\">admin/admin</code>, анонимный Viewer-доступ включён для удобства локальной разработки)<br>- <code class=\"inline\">prometheus/prometheus.yml</code> — два job&#x27;а через <code class=\"inline\">host.docker.internal</code>: <code class=\"inline\">coordinator-dev-up</code> (<code class=\"inline\">:8081</code>, <code class=\"inline\">make dev-up</code>) и <code class=\"inline\">coordinator-dev-stack</code> (<code class=\"inline\">:18080</code>, <code class=\"inline\">make dev-stack</code>) — обычно активен только один, второй просто &quot;down&quot;<br>- <code class=\"inline\">grafana/provisioning/</code> — датасорс Prometheus + дашборд «Coordinator — GameServers» (desired/ready/reserved/allocated replicas, CPU, память, pods measured) прописаны сами при старте</p><p>Проверил живьём против твоего запущенного <code class=\"inline\">dev-stack</code>: <code class=\"inline\">coordinator-dev-stack</code> target — **up**, <code class=\"inline\">/metrics</code> реально скрейпится, датасорс и дашборд появились в Grafana API. <code class=\"inline\">coordinator_gameserver_*</code> гейджи пока пустые — это ожидаемо, они наполнятся, как только на этом coordinator&#x27;е будет запущена хоть одна игра с Fleet&#x27;ом.</p><p>Grafana: http://localhost:3000 (admin/admin или анонимно). Стек сейчас поднят — сказать, если нужно остановить (<code class=\"inline\">docker compose down</code> в <code class=\"inline\">monitoring/</code>).</p>",
+    "ts": "2026-07-12T23:34:27.220Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>напиши команды для запуска в makefile в папке monitoring</p>",
+    "ts": "2026-07-12T23:35:41.440Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь напишу простой Makefile для <code class=\"inline\">monitoring/</code> в том же стиле (<code class=\"inline\">## цель: описание</code> + <code class=\"inline\">help</code> по умолчанию).</p>",
+    "ts": "2026-07-12T23:35:52.424Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю, что <code class=\"inline\">help</code> и <code class=\"inline\">status</code> реально работают (стек уже поднят из прошлого шага).</p>",
+    "ts": "2026-07-12T23:36:03.412Z"
   }
 ]
