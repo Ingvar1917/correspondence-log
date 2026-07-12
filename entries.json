@@ -16673,5 +16673,17 @@
     "who": "claude",
     "html": "<p>30с (<code class=\"inline\">METRICS_COLLECT_INTERVAL</code>, дефолт) — на мой взгляд, разумная середина, и вот почему: увеличивать частоту особого смысла нет, потому что упрётесь в разрешение самого metrics-server (обычно 15-60с scrape-интервал) — чаще опрашивать Agones не значит получать более свежие CPU/RAM-цифры, просто холостой трафик. При этом 30с уже вдвое чаще минутного тика биллинг-loop&#x27;а (<code class=\"inline\">units.Meter</code>), который как раз читает &quot;что живо&quot; из свежих <code class=\"inline\">gameserver_metrics</code> — то есть текущая частота не узкое место для списания юнитов.</p><p>Главный компромисс — не задержка, а нагрузка на Agones/k8s API: каждый тик это три List-вызова (<code class=\"inline\">ListFleetStatuses</code>/<code class=\"inline\">ListGameServers</code>/<code class=\"inline\">ListPodResourceUsage</code>) на кластер, и при росте числа кластеров/регионов это то, что стоило бы мониторить в первую очередь, а не сокращать интервал ради &quot;более live&quot; дашборда.</p>",
     "ts": "2026-07-12T22:52:05.145Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>давай планировать мониторинг самого координатора, какой инструмент нам подходит?</p>",
+    "ts": "2026-07-12T22:53:46.520Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Смотрел код — база уже есть: <code class=\"inline\">GET /metrics</code> у координатора уже отдаёт Prometheus-формат (<code class=\"inline\">prometheus/client_golang</code>, <code class=\"inline\">cmd/coordinator/wiring.go:417</code>), и на <code class=\"inline\">DefaultRegisterer</code> бесплатно висят стандартные Go/process-коллекторы (горутины, GC, память, fds) — просто их сейчас никто не скрейпит и не смотрит. Плюс <code class=\"inline\">/healthz</code>. Но это риск №11 в PROJECT_MAP («Внешний uptime-мониторинг/алертинг именно на сам coordinator») до сих пор ⬜ — открыт.</p><p>Две разные задачи, разные инструменты:</p><p>1. **Внешний uptime-алертинг на <code class=\"inline\">/healthz</code>** — специально должен жить **вне** нашей инфры (иначе не заметим момент, когда всё упало разом). Тут я бы взял готовый SaaS (UptimeRobot / Better Stack / healthchecks.io) — бесплатный тир, ноль своей инфраструктуры, ровно то, что написано в риске.<br>2. **Метрики самого процесса** (латентность HTTP-хендлеров, DB pool, отставание фоновых циклов — collector/watcher/units.Meter, число SSE-подписчиков) — раз формат уже Prometheus, вопрос не «какой формат», а «где хранить и смотреть»: самостоятельно поднимать Prometheus+Grafana+Alertmanager (третий стейтфул-сервис, который сам может лежать вместе с координатором) или отдать в managed (Grafana Cloud free tier — совместим 1-в-1 с уже готовым <code class=\"inline\">/metrics</code>, ноль своей инфры под наблюдение).</p><p>При вашем масштабе (один control-plane, соло/небольшая команда, вы уже приняли даунтайм на single-replica) я бы не городил свой Prometheus-стек ради мониторинга самого координатора — предпочёл бы managed-бэкенд + внешний uptime-чекер. Согласны с таким направлением, или хотите self-hosted?</p>",
+    "ts": "2026-07-12T22:54:54.334Z"
   }
 ]
