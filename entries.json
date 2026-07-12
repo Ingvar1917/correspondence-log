@@ -16625,5 +16625,29 @@
     "who": "claude",
     "html": "<p>Все зелёное. Итог:</p><p>**Что сделано**: статусы инстансов (появление/старт/креш/выход) теперь идут push&#x27;ем, не только поллингом раз в 30с. Новая миграция 000046 добавляет NOTIFY-триггер на <code class=\"inline\">gameserver_instances</code> (по образцу <code class=\"inline\">builds</code>/<code class=\"inline\">account_balances</code>) с scope <code class=\"inline\">instances</code> — глобальный SSE-модуль на фронте (<code class=\"inline\">lib/sse.ts</code>) уже умеет матчить ключ кэша <code class=\"inline\">[&#x27;instances&#x27;, gameId, category]</code> по этому scope без единой правки кода виджета (свойство схемы, описанное в самой карте UI).</p><p>**Важный нюанс триггера**: <code class=\"inline\">UPDATE OF</code> явно перечисляет только лайфсайкл-колонки (<code class=\"inline\">started_at</code>/<code class=\"inline\">ended_at</code>/<code class=\"inline\">category</code>/<code class=\"inline\">reason</code>/<code class=\"inline\">message</code>/<code class=\"inline\">exit_code</code>/<code class=\"inline\">log_tail</code>/<code class=\"inline\">game_id</code>/<code class=\"inline\">gameserver_name</code>/<code class=\"inline\">container_name</code>) — CPU/RAM/players/match_started сознательно исключены. Они тикают каждые 30с на каждый под из <code class=\"inline\">metrics.Collector</code>, и пуш по ним был бы тем же поллингом, только через NOTIFY, заливающим SSE-подписчиков шквалом событий без новой информации (это уже явно проговорено в комментарии <code class=\"inline\">MonitoringTab.tsx</code> про графики). Поэтому для CPU/RAM/players в той же строке инстанса поллинг <code class=\"inline\">METRICS_POLL_MS</code> остался — только статус теперь мгновенный.</p><p>Добавлен интеграционный тест <code class=\"inline\">TestHub_DeliversInstanceLifecycleEventsOnly</code> (реальный Postgres, <code class=\"inline\">dbtest</code>) — доказывает и что лайфсайкл-запись доставляет событие, и что метрик-тик его не порождает. Полный <code class=\"inline\">go test ./...</code>, <code class=\"inline\">tsc -b</code>, vitest (104/104) — чисто. Обновил <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">INDIE_UI_MAP.md</code> (реестр ключей + открытые вопросы) под новый триггер — по конвенции проекта это часть DoD.</p><p>Живьём на dev-стенде не проверял (тот же случай — стек поднят вне сессии); тут проверка простая, если понадобится: скрешить/остановить тестовый инстанс и посмотреть, что карточка меняется без ожидания полминуты.</p>",
     "ts": "2026-07-12T22:41:08.146Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>суммарное количество игроков неправильно отображается в метриках</p>",
+    "ts": "2026-07-12T22:43:01.240Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>[Request interrupted by user]</p>",
+    "ts": "2026-07-12T22:43:34.627Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>забей, я не заметил что графики скролятся по горизонтали</p>",
+    "ts": "2026-07-12T22:44:29.008Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понял, отбой — расследование останавливаю, никаких изменений не делаю.</p>",
+    "ts": "2026-07-12T22:44:32.942Z"
   }
 ]
