@@ -16895,5 +16895,17 @@
     "who": "claude",
     "html": "<p>Готово: <code class=\"inline\">game_regions.buffer_size = 10</code> для единственной free-игры в dev-стеке (<code class=\"inline\">region=dev</code>).</p><p>Учти нюанс: это только правка данных в БД, тарифная валидация в API (<code class=\"inline\">handleUpsertRegion</code>) для free всё ещё 0..0 — если через дашборд кто-то пересохранит настройки этого региона, сервер отклонит любое значение кроме 0 (<code class=\"inline\">400 buffer_out_of_range</code>), это разовое изменение никак не легализует его через UI/API. Также сам буфер (<code class=\"inline\">Replicas</code> в Fleet) выставляется при <code class=\"inline\">Launch</code> — если Fleet для этой игры уже запущен, новое значение попадёт в под-count только при следующем релонче/перезапуске, само по себе оно не реконсайлится в фоне.</p>",
     "ts": "2026-07-12T23:45:45.614Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>по прежнему 0</p>",
+    "ts": "2026-07-12T23:46:55.890Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Данные изменились — процесс <code class=\"inline\">coordinator</code> (dev-stack) успел перезапуститься, и на игру <code class=\"inline\">111</code> (тот же <code class=\"inline\">game_id</code>) появилась **новая** строка региона (<code class=\"inline\">buffer_size=0</code> по умолчанию, id другой: <code class=\"inline\">6be922cb…</code>). Похоже, регион <code class=\"inline\">dev</code> был удалён/пересоздан (в UI есть кнопка «Remove…», после пересоздания сервер выставляет buffer по умолчанию для free — 0). Обновляю текущую строку.</p>",
+    "ts": "2026-07-12T23:47:34.015Z"
   }
 ]
