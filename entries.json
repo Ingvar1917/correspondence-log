@@ -12971,5 +12971,23 @@
     "who": "claude",
     "html": "<p>E2E зелёный живьём. Фиксирую в доках.</p>",
     "ts": "2026-07-12T14:06:17.840Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хвосты закрыты — все, кроме двух, которые честно требуют платёжки.</p><p>## Что сделано</p><p>**1. Гейт запуска по балансу (щель stop-on-zero).** <code class=\"inline\">launcher.Launch</code> и <code class=\"inline\">TestLaunch</code> теперь отбивают <code class=\"inline\">ErrInsufficientUnits</code> при балансе ≤ 0 — раньше запуск при нуле жил бы до первого тика debit-loop&#x27;а. В API это 402 <code class=\"inline\">insufficient_units</code> (сознательно не 403/400 — «нужны юниты» это отдельная категория, с человеческим сообщением «top up to launch»). Тест-хелпер launcher&#x27;а теперь сидит аналог welcome-гранта, как у API-регистрации.</p><p>**2. Trial-колонки снесены (миграция 000042).** <code class=\"inline\">tariffs.trial_eligible</code>, <code class=\"inline\">games.trial_tariff_id</code>/<code class=\"inline\">trial_until</code>, <code class=\"inline\">accounts.trial_used</code> — их никогда не читал ни один код-путь, а юнитовая модель закрыла триал welcome-грантом. Почищены Go-структуры, DTO и типы/фикстуры indie UI.</p><p>**3. Живой e2e перегнан** — <code class=\"inline\">make test-e2e-launcher</code> **PASS**: пересозданный <code class=\"inline\">agones-e2e</code>-кластер (свежий скрипт метит ноды <code class=\"inline\">node-class=shared</code>), реальный <code class=\"inline\">launcher.Launch</code> → настоящий Agones → под получил <code class=\"inline\">memory: 1Gi</code> по <code class=\"inline\">instance_size=m</code>. Это заодно живое подтверждение, что nodeAffinity нодовых классов реально шедулится, не только строит правильный Fleet-объект.</p><p>**4. Dev-ноды переразмечены живьём**: <code class=\"inline\">coordinator-dev</code> и <code class=\"inline\">coordinator-asia</code> получили <code class=\"inline\">coordinator.dev/node-class=shared</code>, старый <code class=\"inline\">coordinator.dev/tariff</code> снят — новые Fleet&#x27;ы в dev шедулятся без пересоздания кластера.</p><p>**Чем доказано:** полный <code class=\"inline\">go test ./...</code> зелёный, оба UI зелёные (93+27), живой e2e PASS (лог: <code class=\"inline\">TestE2E_LaunchAppliesInstanceSizeToRealPod (2.81s)</code>). Доки обновлены: PROJECT_MAP п.12, WHATIF (строка про щель), CLAUDE.md (описание e2e-launcher).</p><p>**Осталось за платёжкой (не закрываемо сейчас):** авто-топап и ×2-ваучер — оба требуют PSP-интеграции (off-session списания, fingerprint карты); крючки в коде готовы, записаны в п.12 как ⬜.</p><p>Коммит-месседж:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-12T14:07:02.542Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>ошибка после пуша</p>",
+    "ts": "2026-07-12T14:08:18.451Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Смотрю, что упало — git-статус и CI.</p>",
+    "ts": "2026-07-12T14:08:26.900Z"
   }
 ]
