@@ -12605,5 +12605,23 @@
     "who": "claude",
     "html": "<p>Поправил (89/89 зелёные). Теперь поле выглядит как соседнее поле архива — единый паттерн формы:</p><p>- подпись одной строкой сверху, короче прежней: «Server port — 7777 fits most engines; also passed to your process as $GAME_PORT»;<br>- инпут — блоком под ней, фиксированной ширины, обычным размером текста (не мелким, как подпись), без обтекания.</p><p>Обнови страницу на дев-стенде — если по глазам всё ещё не то (например, захочешь порт в одну строку с лобби-селектом, чтобы форма была короче), скажи, куда подвинуть: вёрстка тут — дело тридцати секунд, а финальное слово по размещению всё равно за твоей женой на редизайне.</p>",
     "ts": "2026-07-12T00:24:23.194Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>git push origin main<br>Enter passphrase for key &#x27;/home/ihar/.ssh/game-coordinator/id_ed25519_github&#x27;:<br>Enumerating objects: 54, done.<br>Counting objects: 100% (54/54), done.<br>Delta compression using up to 12 threads<br>Compressing objects: 100% (30/30), done.<br>Writing objects: 100% (30/30), 37.55 MiB | 2.74 MiB/s, done.<br>Total 30 (delta 23), reused 0 (delta 0), pack-reused 0 (from 0)<br>remote: Resolving deltas: 100% (23/23), completed with 21 local objects.<br>remote: warning: See https://gh.io/lfs for more information.<br>remote: warning: File coordinator is 91.21 MB; this is larger than GitHub&#x27;s recommended maximum file size of 50.00 MB<br>remote: warning: GH001: Large files detected. You may want to try Git Large File Storage - https://git-lfs.github.com.<br>To github.com:Ingvar1917/game-coordinator.git<br>   4f75087..59a26a9  main -&gt; main</p><p>что за варнинги?</p>",
+    "ts": "2026-07-12T00:26:12.391Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это заезжий пассажир: в репо закоммичен файл <code class=\"inline\">coordinator</code> на 91 MB — почти наверняка собранный Go-бинарь (результат <code class=\"inline\">go build -o coordinator</code> или <code class=\"inline\">go build ./cmd/coordinator</code> в корне). GitHub предупреждает (пока не блокирует — жёсткий лимит 100 MB близко). Смотрю, когда он заехал и что с .gitignore:</p>",
+    "ts": "2026-07-12T00:26:31.529Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Диагноз подтверждён: это **Go-бинарь <code class=\"inline\">coordinator</code> на 92 MB** (ELF, с дебаг-инфой — след от <code class=\"inline\">go build -o coordinator ...</code> в корне репо), и он заехал ровно в **последний коммит** <code class=\"inline\">59a26a9</code>, который ты только что запушил. GitHub пока только ворчит (рекомендуемый максимум 50 MB), но жёсткий лимит — 100 MB, и главное: блоб уже в истории — каждый будущий clone будет таскать эти 92 MB вечно, а если бинарь пересобрать и перекоммитить, каждый раз будет добавляться *новый* блоб. В <code class=\"inline\">.gitignore</code> его нет (там только <code class=\"inline\">bin/</code>), поэтому и проскочил.</p><p>Хорошая новость: раз он появился только в верхнем коммите, чистится это без тяжёлой артиллерии (filter-repo не нужен) — правим последний коммит и перепушиваем его:</p><pre><code>git rm --cached coordinator          # убрать из индекса, файл на диске остаётся\necho &quot;/coordinator&quot; &gt;&gt; .gitignore    # чтобы больше не заехал\ngit add .gitignore\ngit commit --amend --no-edit         # тот же коммит, но без бинаря\ngit push --force-with-lease origin main\n</code></pre><p><code class=\"inline\">--force-with-lease</code> безопасен: перепишет ровно твой свежепушенный коммит и откажется, если на remote вдруг появилось что-то чужое (в соло-репо не появится). CI прогонится заново по амендированному коммиту — это нормально. После этого предупреждение исчезнет и блоб не останется в истории (GitHub соберёт его мусорщиком).</p><p>Хочешь — выполню первые четыре команды сам прямо сейчас, а тебе останется только <code class=\"inline\">git push --force-with-lease</code> (пуш всё равно твой — он спросит passphrase от ключа, которую знаешь только ты). Скажи «давай».</p><p>И на будущее: бинарь появился, скорее всего, от ручного <code class=\"inline\">go build -o coordinator ./cmd/coordinator</code> или просто <code class=\"inline\">go build ./cmd/coordinator</code> в корне — если это был осознанный способ собрать локальный бинарь, лучше <code class=\"inline\">go build -o bin/coordinator ./cmd/coordinator</code> (каталог <code class=\"inline\">bin/</code> уже в gitignore), а dev-stack и так собирает сам.</p>",
+    "ts": "2026-07-12T00:27:12.550Z"
   }
 ]
