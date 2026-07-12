@@ -14267,5 +14267,17 @@
     "who": "claude",
     "html": "<p>Всё выглядит корректно, файл заканчивается на <code class=\"inline\">REMOTE</code>. Структура и логика верны.</p>",
     "ts": "2026-07-12T20:17:58.449Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Что изменилось в <code class=\"inline\">.github/workflows/ci.yml</code>:** deploy-джоба теперь сравнивает список изменённых файлов коммита с <code class=\"inline\">github.event.before</code>; если всё лежит внутри <code class=\"inline\">landing/</code>, SSH-скрипт делает <code class=\"inline\">git pull</code> и выходит — без репетиции миграций, без <code class=\"inline\">docker compose pull/up coordinator</code>, то есть **без простоя вообще** (не 15 секунд, а 0). Если задет хоть один файл вне <code class=\"inline\">landing/</code> — идёт прежний полный путь.</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-12T20:18:04.799Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>ну и думаю обновлять все ui вместе с backend оптимальный вариант</p>",
+    "ts": "2026-07-12T20:18:53.864Z"
   }
 ]
