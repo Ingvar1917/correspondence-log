@@ -16907,5 +16907,23 @@
     "who": "claude",
     "html": "<p>Данные изменились — процесс <code class=\"inline\">coordinator</code> (dev-stack) успел перезапуститься, и на игру <code class=\"inline\">111</code> (тот же <code class=\"inline\">game_id</code>) появилась **новая** строка региона (<code class=\"inline\">buffer_size=0</code> по умолчанию, id другой: <code class=\"inline\">6be922cb…</code>). Похоже, регион <code class=\"inline\">dev</code> был удалён/пересоздан (в UI есть кнопка «Remove…», после пересоздания сервер выставляет buffer по умолчанию для free — 0). Обновляю текущую строку.</p>",
     "ts": "2026-07-12T23:47:34.015Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>В БД теперь <code class=\"inline\">buffer_size=10</code> для строки региона <code class=\"inline\">dev</code> игры <code class=\"inline\">111</code>. Обнови страницу дашборда (F5/hard refresh) — значение должно подтянуться.</p><p>Важно: это по-прежнему обходной путь мимо тарифной валидации. Если через UI снова тронуть этот регион (Remove и заново добавить, или просто сохранить настройки региона) — сервер (<code class=\"inline\">handleUpsertRegion</code>) откатит buffer на 0, т.к. для free <code class=\"inline\">buffer_min=buffer_max=0</code>. Если нужно, чтобы значение держалось стабильно при работе через UI, а не только пока никто его не трогает руками — это уже not &quot;разово&quot;, а смена тарифной политики в коде/миграции, о чём говорили раньше.</p>",
+    "ts": "2026-07-12T23:47:49.233Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделай в мегабайтах, а если больше 1000 то в гигабайтах</p>",
+    "ts": "2026-07-12T23:50:42.037Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Провижининг перечитывает файлы дашбордов раз в 30с (<code class=\"inline\">updateIntervalSeconds: 30</code> в <code class=\"inline\">dashboards.yml</code>), сам файл смонтирован в контейнер — рестарт не нужен. Проверю, что Grafana подхватила изменение.</p>",
+    "ts": "2026-07-12T23:51:15.777Z"
   }
 ]
