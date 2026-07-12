@@ -13259,5 +13259,29 @@
     "who": "claude",
     "html": "<p>Выполняю. П.2 (коллизии: веб, GitHub, npm) — полностью; п.1 (товарные знаки) — прогоню через индексируемое зеркало USPTO (Justia) и поиск, официальные формы дам для контрольного взгляда. Обоих финалистов: Gameplane и Pounce.</p>",
     "ts": "2026-07-12T16:59:33.250Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обе проверки выполнены, и результат отрезвляющий — хорошо, что проверили **до** покупки домена.</p><p>## Gameplane — рекомендую снять с рассмотрения</p><p>1. **Товарные знаки**: точного «GAMEPLANE» в USPTO-зеркале нет, но есть **живые марки «GAMEPLAN»**, включая downloadable software ([Comayers Inc., рег. 5155388](https://trademarks.justia.com/871/07/gameplan-87107367.html)) — фонетически идентично (plane/plan на слух не различаются), а «звучит одинаково» — реальное основание для отказа/претензии по likelihood of confusion.<br>2. **Коллизии в нашей же индустрии**: [Gameplane Media](https://www.linkedin.com/company/gameplane-media) + Gameplane Esports — живые: [X](https://x.com/gameplanemedia), два YouTube-канала ([Hearthstone](https://www.youtube.com/channel/UCv4IKw9phF1NSxXD1gMZjqg), [Brawl Stars](https://www.youtube.com/channel/UCzKnd_r1Jflyz8FWgyXmEVQ)), Facebook. Плюс созвучная [Gameplan Media (gpmedia.gg)](https://gpmedia.gg/). Поисковая выдача по имени уже занята чужими, «тест звонка другу» имя проваливает.</p><p>Свободный домен оказался приманкой: свободен, потому что имя проблемное.</p><p>## Pounce — жизнеспособен, но с тремя оговорками</p><p>1. **Товарные знаки**: явных живых «POUNCE»-марок в софте/играх зеркало не показало (только детские книги 2005). Но это словарное слово — регистрации в смежных классах вероятны, нужен контрольный взгляд глазами: [USPTO-поиск](https://tmsearch.uspto.gov/search/search-information) и [EUIPO eSearch](https://euipo.europa.eu/eSearch/) по классам 9 и 42.<br>2. **Коллизии**: многолюдно, но без доминанта — [hyper-casual игра Pounce в Google Play](https://play.google.com/store/apps/details?id=com.techymaugames.pounce) (самая неприятная — категория «игры»), [израильский commerce-app](https://finder.startupnationcentral.org/company_page/buycode-pounce-app), [финская студия pounce.fi](https://www.pounce.fi/), accounting-тул, на GitHub/npm — мелкие библиотеки (nvim-плагин ★366, мёртвый react-пакет). Никто не владеет словом в dev-сознании; выдачу придётся выигрывать связкой «pounce + hosting/gg».<br>3. **Домен занят** — выкуп/торг у парковки.</p><p>## Моя рекомендация</p><p>Не жениться ни на одном: у Gameplane — дисквалифицирующие находки, у Pounce — сумма оговорок (домен + игра-тёзка + грязная выдача) при словарном слове. Урок этого раунда: словарные слова и фонетические близнецы известных слов проверку не проходят; чисто проходят **coined-имена** (выдуманные — как Agones, Hathora, Vercel). Предлагаю третий раунд: сгенерю шорт-лист из 5–7 coined-кандидатов под наши же критерии и прогоню каждый через этот же пайплайн (DNS → trademark-зеркало → веб/GitHub/npm) — теперь он отработан и занимает минуты. Делать?</p><p>Sources: [Gameplane Media LinkedIn](https://www.linkedin.com/company/gameplane-media), [GAMEPLAN trademark](https://trademarks.justia.com/871/07/gameplan-87107367.html), [gpmedia.gg](https://gpmedia.gg/), [Pounce app](https://finder.startupnationcentral.org/company_page/buycode-pounce-app), [Pounce game](https://play.google.com/store/apps/details?id=com.techymaugames.pounce), [pounce.fi](https://www.pounce.fi/)</p>",
+    "ts": "2026-07-12T17:02:13.663Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>думаем дальше над именем</p>",
+    "ts": "2026-07-12T17:02:30.240Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Раунд 3 — coined-имена. Генеральная идея, которая мне нравится больше механических неологизмов: **малые дикие кошки** — настоящие слова, но не словарно-бытовые (trademark-чище), маскот встроен в имя по построению, произносятся международно. И среди них есть жемчужина: **Serval** — сервал начинается с «serv-», каламбур «SERVer» зашит в название кошки буквально. Плюс запасные направления.</p><p>Шорт-лист на проверку: **Serval** (флагман), **Manul** (интернет-знаменитый кот-мем, но без привязки к конкретному мему), **Caracal**, **Felis** (латинский род кошачьих), **Playden** (play + den, «логово» — тоже кошачье). Гоню пайплайн: DNS → GitHub/npm → веб/trademark.</p>",
+    "ts": "2026-07-12T17:03:36.435Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">serval.gg</code> **и** <code class=\"inline\">serval.dev</code> оба свободны, manul.gg и caracal.gg тоже. Проверяю коллизии Serval.</p>",
+    "ts": "2026-07-12T17:03:56.207Z"
   }
 ]
