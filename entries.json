@@ -16925,5 +16925,23 @@
     "who": "claude",
     "html": "<p>Провижининг перечитывает файлы дашбордов раз в 30с (<code class=\"inline\">updateIntervalSeconds: 30</code> в <code class=\"inline\">dashboards.yml</code>), сам файл смонтирован в контейнер — рестарт не нужен. Проверю, что Grafana подхватила изменение.</p>",
     "ts": "2026-07-12T23:51:15.777Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Подтверждено — Grafana подхватила изменение: панель называется «Memory», unit = <code class=\"inline\">decbytes</code>.</p><p>Изменил панель Memory в <code class=\"inline\">monitoring/grafana/provisioning/dashboards/json/coordinator-gameservers.json</code>: unit <code class=\"inline\">decbytes</code> — это встроенный десятичный формат Grafana (B → kB → MB → GB, шаг ×1000), он как раз даёт то, что нужно: значения показываются в МБ, а при переходе за 1000 МБ (=1 ГБ) автоматически переключаются на ГБ. Убрал «(bytes)» из заголовка, раз единицы теперь сами подписываются на графике.</p>",
+    "ts": "2026-07-12T23:51:34.240Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>время жизни данных в прометеус  14 дней</p>",
+    "ts": "2026-07-12T23:53:15.913Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Применяю: пересоздаю контейнер Prometheus с новым флагом.</p>",
+    "ts": "2026-07-12T23:53:31.541Z"
   }
 ]
