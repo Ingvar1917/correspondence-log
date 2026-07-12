@@ -16943,5 +16943,23 @@
     "who": "claude",
     "html": "<p>Применяю: пересоздаю контейнер Prometheus с новым флагом.</p>",
     "ts": "2026-07-12T23:53:31.541Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Prometheus подтверждает флаг <code class=\"inline\">--storage.tsdb.retention.time=14d</code> (API отдаёт <code class=\"inline\">2w</code>, эквивалент 14 дней) — данные старше этого срока будут вычищаться автоматически.</p>",
+    "ts": "2026-07-12T23:53:53.921Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>я остановил у индюка все инстансы но графана этого не отображает</p>",
+    "ts": "2026-07-12T23:54:22.509Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл причину, и это не баг Grafana/Prometheus — Fleet у игры реально удалён (<code class=\"inline\">kubectl get fleets</code> — пусто), но метрики в <code class=\"inline\">/metrics</code> всё ещё висят на старых значениях.</p>",
+    "ts": "2026-07-12T23:55:09.245Z"
   }
 ]
