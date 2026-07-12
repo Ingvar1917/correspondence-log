@@ -16733,5 +16733,17 @@
     "who": "claude",
     "html": "<p>Идея рабочая, и переключение действительно будет дешёвым — но один нюанс важен сразу, до того как что-то разворачивать: **сама Grafana ничего не хранит и не принимает push** — это только UI поверх БД временных рядов. Ей нужен движок за спиной: либо Prometheus в pull-режиме (сам тянет ваш <code class=\"inline\">/metrics</code> — но тогда машине с Prometheus нужна сетевая видимость до dev-компа, что при NAT/ноутбуке не всегда удобно), либо что-то, что реально принимает <code class=\"inline\">remote_write</code> (push) — vanilla Prometheus этого из коробки не умеет.</p><p>Поэтому для вашей push-схемы я бы взял **VictoriaMetrics** (single-binary) рядом с Grafana на том же внешнем компе — он нативно принимает <code class=\"inline\">remote_write</code> и легче, чем разворачивать Mimir/Cortex ради одного тестового стенда. А на стороне координатора — тот же агент (Grafana Alloy), что и для Grafana Cloud: скрейпит <code class=\"inline\">localhost:8080/metrics</code> и пушит наружу.</p><p>Отсюда и хорошая новость: эта схема **буквально идентична** тому, что понадобится для Grafana Cloud — разница только в URL эндпоинта remote_write и токене. То есть дашборды и alert-правила, собранные на локальной Grafana, экспортируются JSON&#x27;ом и импортируются в Grafana Cloud один в один — не просто «подключение», а вся визуальная работа тоже переедет без переделки. План логичный, я бы его брал.</p>",
     "ts": "2026-07-12T23:06:02.068Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>не, комп тот же на котором запускаю dev-stack</p>",
+    "ts": "2026-07-12T23:06:41.889Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>А, ну тогда всё проще — не нужен ни VictoriaMetrics, ни push, ни Alloy-агент отдельно. На одной машине Prometheus в классическом pull-режиме сам достаёт до <code class=\"inline\">localhost:8080/metrics</code> без всяких сетевых сложностей — это самый стандартный, самый описанный в доках вариант: <code class=\"inline\">docker-compose</code> с Prometheus (конфиг — один scrape-таргет) + Grafana поверх него как datasource.</p><p>И переключение на Grafana Cloud позже станет даже проще, чем я говорил: у самого Prometheus есть встроенный <code class=\"inline\">remote_write</code> — то есть при переезде просто дописываете в тот же конфиг Prometheus блок <code class=\"inline\">remote_write</code> с URL+токеном Grafana Cloud, никакой новый компонент разворачивать не надо. Дашборды и алерты, как и раньше — экспорт/импорт JSON&#x27;ом, без переделки.</p><p>Хотите, соберу <code class=\"inline\">docker-compose.yml</code> (Prometheus + Grafana) и конфиг скрейпа под ваш dev-stack?</p>",
+    "ts": "2026-07-12T23:06:58.344Z"
   }
 ]
