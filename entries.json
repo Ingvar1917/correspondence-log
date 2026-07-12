@@ -13055,5 +13055,17 @@
     "who": "claude",
     "html": "<p>Обновляю описание dev-stack в CLAUDE.md.</p>",
     "ts": "2026-07-12T14:36:07.140Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Что сделано и чем доказано:</p><p>**[dev-stack.sh](deploy/local/dev-stack.sh)** — оба Vite теперь стартуют с <code class=\"inline\">--host</code> (слушают 0.0.0.0), а в конце скрипт печатает готовые LAN-ссылки, определяя IP машины сам:</p><pre><code>\n&gt;&gt; из локальной сети:   http://192.168.0.100:15173/app/  ·  http://192.168.0.100:15174/adminapp/\n!! активен файрвол — если из сети не открывается, разреши порты 15173/15174 (tcp)\n</code></pre><p>Coordinator наружу выставлять не пришлось: Vite-прокси <code class=\"inline\">/dashboard</code>→<code class=\"inline\">:18080</code> работает server-side, чужие устройства ходят только на Vite. Сессионная кука не <code class=\"inline\">Secure</code> на http (флаг выводится из TLS), так что логин с другого устройства работает; HMR-websocket Vite строит от Host запроса — тоже ок.</p><p>**Проверено живьём**: поднял тестовый Vite с <code class=\"inline\">--host</code> — <code class=\"inline\">ss</code> показывает <code class=\"inline\">*:15199</code> (все интерфейсы), и страница реально отвечает по <code class=\"inline\">http://192.168.0.100:...</code> (не только localhost). Тестовый процесс убран, порт свободен.</p><p>**Одно действие за тобой**: на машине активен **ufw**, он режет входящие из сети. Открой порты (нужен пароль sudo, я не могу):</p><pre><code>\nsudo ufw allow 15173/tcp &amp;&amp; sudo ufw allow 15174/tcp\n</code></pre><p>Скрипт сам напоминает об этом при запуске, если файрвол активен (проверка <code class=\"inline\">systemctl is-active firewalld/ufw</code>). CLAUDE.md — обновлён (описание dev-stack).</p><p>Коммит-месседж:<br>\u0000FENCE2\u0000</p>",
+    "ts": "2026-07-12T14:36:43.541Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>units уже закончили?</p>",
+    "ts": "2026-07-12T14:41:33.885Z"
   }
 ]
