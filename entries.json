@@ -14645,5 +14645,125 @@
     "who": "claude",
     "html": "<p>Реализация готова, все автоматические проверки зелёные:</p><p>- <code class=\"inline\">go build</code>, <code class=\"inline\">go vet</code>, <code class=\"inline\">gofmt -l .</code>, полный <code class=\"inline\">go test ./...</code> (не <code class=\"inline\">-short</code> — миграция схемы) — чисто.<br>- <code class=\"inline\">dashboardui</code>: 96 vitest-тестов зелёные, <code class=\"inline\">tsc -b</code> без ошибок.<br>- <code class=\"inline\">INDIE_UI_MAP.md</code>, <code class=\"inline\">PROJECT_MAP.md</code>, <code class=\"inline\">WHATIF.md</code>, <code class=\"inline\">CLAUDE.md</code>, <code class=\"inline\">design/BRIEF.md</code> — обновлены под новую структуру.</p><p>**Что не проверено живьём**: у вас уже поднят <code class=\"inline\">make dev-stack</code> (процессы Vite с 16:56, coordinator отвечает на <code class=\"inline\">:18080/healthz</code>) — я его не трогал, чтобы не сорвать текущую сессию. Новая миграция 000043 применится только при рестарте локального coordinator-бинаря. Если хотите живую проверку (запустить Test Launch → увидеть инстанс «running» в новой секции Monitoring → остановить → увидеть <code class=\"inline\">normal_exit</code> с логом) — скажите, я пересоберу и перезапущу стек сам, либо сделайте <code class=\"inline\">make dev-stack-stop &amp;&amp; make dev-stack</code> и проверьте вручную.</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
     "ts": "2026-07-12T21:20:01.083Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>а можно выводить для запущенных инстансов live log live метрики cpu/ram/players, так же для тестового инстанса</p>",
+    "ts": "2026-07-12T21:23:08.528Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Начинаю с <code class=\"inline\">instances/watcher.go</code>:</p>",
+    "ts": "2026-07-12T21:27:31.264Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь то же самое в <code class=\"inline\">metrics.Collector.upsertInstanceSnapshots</code>:</p>",
+    "ts": "2026-07-12T21:28:07.123Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба пакета собираются. Теперь <code class=\"inline\">instances.Repository.ListByGame</code> — добавляю LEFT JOIN и поле <code class=\"inline\">Region</code>.</p>",
+    "ts": "2026-07-12T21:28:37.852Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — сначала добавлю поле <code class=\"inline\">Region</code> в <code class=\"inline\">Instance</code>, потом поправлю сам SQL-запрос в <code class=\"inline\">ListByGame</code>.</p>",
+    "ts": "2026-07-12T21:29:14.919Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сам запрос в <code class=\"inline\">ListByGame</code>:</p>",
+    "ts": "2026-07-12T21:29:28.358Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собирается. Теперь <code class=\"inline\">dashboardapi</code>: добавляю <code class=\"inline\">Region</code> в <code class=\"inline\">instanceView</code>.</p>",
+    "ts": "2026-07-12T21:29:44.929Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собирается чисто. Теперь пишу/обновляю Go-тесты для нового поведения.</p>",
+    "ts": "2026-07-12T21:30:30.337Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю новый тест сразу после <code class=\"inline\">TestWatcher_RecordsRunningSightingBeforeTermination</code>:</p>",
+    "ts": "2026-07-12T21:31:17.450Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тест для <code class=\"inline\">metrics.Collector</code>:</p>",
+    "ts": "2026-07-12T21:31:34.660Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю новый тест сразу после этого:</p>",
+    "ts": "2026-07-12T21:31:42.262Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тест в <code class=\"inline\">dashboardapi/handlers_test.go</code> на поле <code class=\"inline\">region</code>:</p>",
+    "ts": "2026-07-12T21:31:55.878Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь прогоняю сборку и все тесты по бэкенду.</p>",
+    "ts": "2026-07-12T21:32:18.185Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Теперь фронтенд.</p>",
+    "ts": "2026-07-12T21:33:07.938Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо. Теперь <code class=\"inline\">MonitoringTab.tsx</code> — поллинг + кнопка Logs/LogDrawer для running-инстансов.</p>",
+    "ts": "2026-07-12T21:33:34.059Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь блок лога (running → кнопка Logs вместо текста «ещё работает») и рендер <code class=\"inline\">LogDrawer</code>:</p>",
+    "ts": "2026-07-12T21:34:00.679Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю рендер <code class=\"inline\">LogDrawer</code> в конце секции:</p>",
+    "ts": "2026-07-12T21:34:07.824Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто. Теперь обновляю тесты <code class=\"inline\">MonitoringTab.test.tsx</code> под новое поведение (кнопка Logs, поллинг) и прогоняю весь набор.</p>",
+    "ts": "2026-07-12T21:34:29.893Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 98 тестов зелёные (было 96, +2 новых). tsc уже проверен ранее — чисто. Финальный полный прогон Go-стороны на всякий случай, раз были правки после последнего <code class=\"inline\">go test ./...</code>:</p>",
+    "ts": "2026-07-12T21:35:14.932Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — все восемь задач выполнены. Итог:</p><p>**Backend**: <code class=\"inline\">instances.Watcher</code> и <code class=\"inline\">metrics.Collector</code> теперь резолвят <code class=\"inline\">game_id</code> с fallback&#x27;ом на паттерн <code class=\"inline\">test-&lt;uuid&gt;</code> (когда <code class=\"inline\">FleetNameLabel</code> отсутствует — ровно случай standalone Test Launch инстансов, которые раньше были полностью невидимы этому пайплайну). <code class=\"inline\">instances.Repository.ListByGame</code> джойнит <code class=\"inline\">cluster_registry</code> за <code class=\"inline\">region</code>, проброшенный до <code class=\"inline\">instanceView</code> (<code class=\"inline\">GET /games/{id}/instances</code>).</p><p>**Frontend**: секция «Инстансы» теперь поллит <code class=\"inline\">METRICS_POLL_MS</code> (те же 30с, что и графики) — CPU/RAM/players у работающих инстансов реально обновляются, а не застывают на моменте открытия страницы. У работающего инстанса с известным <code class=\"inline\">region</code> вместо текста «ещё работает» — кнопка Logs, открывающая уже существующий <code class=\"inline\">LogDrawer</code> (тот же SSE live-tail, что и у деплой-виджета) по URL <code class=\"inline\">.../regions/{region}/instances/{pod_name}/logs/stream</code>.</p><p>Все проверки зелёные: <code class=\"inline\">go build/vet/gofmt</code>, полный <code class=\"inline\">go test ./...</code>, <code class=\"inline\">tsc -b</code>, <code class=\"inline\">vitest</code> (98/98).</p><p>**Не проверено живьём** — та же оговорка, что в прошлый раз: у вас уже поднят <code class=\"inline\">make dev-stack</code> вне этой сессии, я его не трогал. Раз это первая проверка того, что standalone Test Launch инстанс вообще подхватывается новым пайплайном — стоило бы поткнуть живьём (создать Test Launch → увидеть его в «Инстансы» с бейджем running, регионом и рабочей кнопкой Logs), но решать вам: пересобрать/перезапустить стек сам, или сделаете сами.</p>",
+    "ts": "2026-07-12T21:35:35.219Z"
   }
 ]
