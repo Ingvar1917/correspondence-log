@@ -12635,5 +12635,35 @@
     "who": "claude",
     "html": "<p>Проверяю — и уже подозреваю, что виновник я:</p>",
     "ts": "2026-07-12T00:29:10.879Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Исправлено. Что сделано:</p><p>- Коммит переамендирован (<code class=\"inline\">59a26a9</code> → <code class=\"inline\">35a17d3</code>, то же сообщение, тот же состав правок) — **без** 92-мегабайтного бинаря.<br>- <code class=\"inline\">/coordinator</code> добавлен в <code class=\"inline\">.gitignore</code> — рецидив невозможен, даже если я снова запущу ту же команду сборки.<br>- Сам файл удалён с диска (это был просто артефакт проверки компиляции, пересобирается когда угодно).<br>- Рабочее дерево чистое.</p><p>Остался один шаг за тобой (нужна твоя passphrase):</p><pre><code>git push --force-with-lease origin main\n</code></pre><p>Он заменит на GitHub только вчерашний коммит его чистой версией; варнинг исчезнет, и блоб не останется висеть в истории клонов. CI прогонится заново по новому хэшу — это ожидаемо.</p><p>Урок в копилку с моей стороны: впредь проверочные сборки одиночного пакета делаю как <code class=\"inline\">go build -o /dev/null ./cmd/coordinator</code> — компиляция проверяется, артефакт не рождается. Хорошо, что GitHub заворчал сразу, а не когда бинарей накопилось бы пять штук по 92 MB.</p>",
+    "ts": "2026-07-12T00:30:13.035Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>--- FAIL: TestLaunchGame_RejectsMissingGamePort (0.46s)<br>    handlers_test.go:861: status = 200, want 400, body={&quot;regions&quot;:[{&quot;region&quot;:&quot;eu&quot;,&quot;status&quot;:&quot;launched&quot;}]}<br>FAIL<br>FAIL\tcoordinator/internal/coordinator/dashboardapi\t24.402s</p><p>при go test ./...</p>",
+    "ts": "2026-07-12T00:32:36.640Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Моя недоработка в проверке: после смены дефолта порта я прогнал <code class=\"inline\">dashboardapi</code> только с <code class=\"inline\">-run TestCreateGame</code>, а полный пакет — лишь под <code class=\"inline\">-short</code>, где DB-bound тесты скипаются. Этот тест проверяет защиту launcher&#x27;а от порта 0 — теперь через API такое состояние не создаётся (дефолт 7777), но сама защита в launcher&#x27;е осталась и должна остаться протестированной. Чиню тест честно — конструирую нулевой порт напрямую в БД, в обход API:</p>",
+    "ts": "2026-07-12T00:32:55.776Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тот же класс в пакете launcher — правлю аналогично:</p>",
+    "ts": "2026-07-12T00:34:41.683Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба починены, полный прогон (<code class=\"inline\">go test ./...</code>, не short) чистый. Причина, почему я это пропустил: после смены дефолта порта я гонял затронутые пакеты точечно, а финальную проверку — под <code class=\"inline\">-short</code>, где все DB-bound пакеты скипаются. Ровно два теста в них проверяли сценарий «порт не настроен», который через API больше не воспроизводится (дефолт 7777).</p><p>Важно, что фикс — не удаление проверок: guard <code class=\"inline\">ErrGamePortNotConfigured</code> в launcher&#x27;е остаётся полезной защитой от кривых данных в БД (defense-in-depth), поэтому оба теста теперь конструируют нулевой порт честным способом — прямым <code class=\"inline\">UPDATE</code> в тестовую базу в обход API, с комментарием почему.</p><p>Правки лежат незакоммиченными (два тестовых файла). Если ты ещё **не** делал force-push амендированного коммита — удобнее вамендить и их туда же:</p><pre><code>git add -A &amp;&amp; git commit --amend --no-edit\ngit push --force-with-lease origin main\n</code></pre><p>Если уже запушил — обычный коммит поверх (<code class=\"inline\">git add -A &amp;&amp; git commit -m &quot;fix port-guard tests after default 7777&quot;</code> и обычный push).</p><p>И вывод для меня на будущее, чтобы класс ошибки не повторялся: после правок, меняющих *семантику данных* (дефолты, констрейнты), финальная проверка — полный <code class=\"inline\">go test ./...</code> без <code class=\"inline\">-short</code>, а не быстрый прогон; <code class=\"inline\">-short</code> годится только для правок, не трогающих то, что видно из БД.</p>",
+    "ts": "2026-07-12T00:36:10.816Z"
   }
 ]
