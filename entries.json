@@ -14375,5 +14375,275 @@
     "who": "ihar",
     "html": "<p>&lt;task-notification&gt;<br>&lt;task-id&gt;aaf489d36cbf91d87&lt;/task-id&gt;<br>&lt;tool-use-id&gt;toolu_015e3mXyv4eR4QFGkc33x5mJ&lt;/tool-use-id&gt;<br>&lt;output-file&gt;/tmp/claude-1000/-home-ihar-Games-coordinator/c9fbb019-ca4a-4c09-9c68-b391f5b74ce1/tasks/aaf489d36cbf91d87.output&lt;/output-file&gt;<br>&lt;status&gt;completed&lt;/status&gt;<br>&lt;summary&gt;Agent &quot;Explore dashboardapi metrics/incidents endpoints and DTOs&quot; finished&lt;/summary&gt;<br>&lt;note&gt;A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.&lt;/note&gt;<br>&lt;result&gt;I now have everything needed. Here&#x27;s the full report.</p><p>## 1. Handlers for <code class=\"inline\">GET /games/{id}/metrics</code> and <code class=\"inline\">GET /games/{id}/incidents</code></p><p>File: <code class=\"inline\">/home/ihar/Games/coordinator/internal/coordinator/dashboardapi/handlers.go</code></p><p>**Route registration** — <code class=\"inline\">/home/ihar/Games/coordinator/internal/coordinator/dashboardapi/server.go</code> (in <code class=\"inline\">(s *Server) Handler()</code>, lines 120-121):<br>\u0000FENCE0\u0000<br>(All routes for this package are registered in this one <code class=\"inline\">Handler()</code> method — no separate <code class=\"inline\">router.go</code>; <code class=\"inline\">cmd/coordinator</code> just calls <code class=\"inline\">dashboardapi.NewServer(...).Handler()</code>.)</p><p>**<code class=\"inline\">handleListIncidents</code>** (handlers.go:862-888):<br>\u0000FENCE1\u0000</p><p>**<code class=\"inline\">handleListMetrics</code>** (handlers.go:911-952) — the more elaborate one, has both <code class=\"inline\">?limit=</code> and <code class=\"inline\">?since=</code> (mutually exclusive):<br>\u0000FENCE2\u0000</p><p>**Query-param parsing helpers** (shared, handlers.go):<br>- <code class=\"inline\">queryLimit(r *http.Request) int</code> — <code class=\"inline\">?limit=</code> (lines 41-54): invalid/absent → <code class=\"inline\">defaultListLimit=50</code>, capped at <code class=\"inline\">maxListLimit=200</code>. Deliberately silent-fallback (&quot;read-only convenience endpoints, not worth rejecting a request over&quot;).<br>- <code class=\"inline\">querySince(w, r) (*time.Time, bool)</code> — <code class=\"inline\">?since=</code> (lines 898-909): RFC3339 only; **errors (400 <code class=\"inline\">invalid_request</code>) on bad input**, not silent fallback, &quot;for the same reason as querySessionStatuses&quot; (changing which data is returned shouldn&#x27;t happen silently).<br>- <code class=\"inline\">maxMetricsWindowRows = 10000</code> — payload/DoS cap when <code class=\"inline\">since</code> is used instead of <code class=\"inline\">limit</code> (comment explains it&#x27;s not a paging mechanism, &quot;retention/rollup work... will subsume&quot;).</p><p>Both handlers follow the same pattern: <code class=\"inline\">authenticate</code> → <code class=\"inline\">parsePathUUID</code> → <code class=\"inline\">requireOwnedGame</code> (ownership check via <code class=\"inline\">games.GetOwned</code>) → repository call → map domain → DTO slice → <code class=\"inline\">writeJSON</code>.</p><p>**DTO mapping functions** (dto.go): <code class=\"inline\">newIncidentView(i *incidents.Incident) incidentView</code> and <code class=\"inline\">newMetricView(s *metrics.Snapshot) metricView</code> — both simple 1:1 field copies.</p><p>## 2. <code class=\"inline\">errors.go</code> — error → HTTP status convention</p><p>File: <code class=\"inline\">/home/ihar/Games/coordinator/internal/coordinator/dashboardapi/errors.go</code></p><p>Central <code class=\"inline\">mapDomainError(err error) (status int, code string)</code> (lines 21-118) does a big <code class=\"inline\">switch { case errors.Is(err, X): return status, &quot;snake_case_code&quot; }</code> over every domain sentinel error (from <code class=\"inline\">accounts</code>, <code class=\"inline\">games</code>, <code class=\"inline\">launcher</code>, <code class=\"inline\">sessions</code>, <code class=\"inline\">builds</code>, <code class=\"inline\">presets</code>, <code class=\"inline\">agones</code>). Unmatched errors fall to <code class=\"inline\">default: return http.StatusInternalServerError, &quot;internal_error&quot;</code>.</p><p><code class=\"inline\">writeDomainError(w, err)</code> (lines 120-128) is the single call site handlers use:<br>\u0000FENCE3\u0000<br><code class=\"inline\">writeError</code> (server_helpers side, <code class=\"inline\">errors.go</code>&#x27;s sibling in <code class=\"inline\">router.go</code>-equivalent — actually defined in dto.go&#x27;s neighbor, but really: found in server.go&#x27;s package-level helper file, — precisely it&#x27;s in <code class=\"inline\">errors.go</code>&#x27;s companion; verified location: <code class=\"inline\">writeError</code>/<code class=\"inline\">writeJSON</code>/<code class=\"inline\">errorResponse</code> are defined at the top of **dto.go**, lines 19-37) produces:<br>\u0000FENCE4\u0000<br>Convention for a **new** endpoint: add any new sentinel errors from your domain package to this switch (e.g. <code class=\"inline\">errors.Is(err, someinstancepkg.ErrX)</code> → appropriate status), and let unrecognized errors fall through to the 500 default — don&#x27;t hand-roll status codes in the handler itself.</p><p>## 3. <code class=\"inline\">dto.go</code> — metrics &amp;amp; incidents DTOs, NULL handling</p><p>File: <code class=\"inline\">/home/ihar/Games/coordinator/internal/coordinator/dashboardapi/dto.go</code></p><p>**<code class=\"inline\">metricView</code>** (lines 285-318) — backs <code class=\"inline\">GET /games/{id}/metrics</code>:<br>\u0000FENCE5\u0000<br>**Important finding**: <code class=\"inline\">metricView</code>/domain <code class=\"inline\">metrics.Snapshot</code> is **per-Fleet aggregate**, not per-pod — <code class=\"inline\">FleetName</code> only, <code class=\"inline\">CPUMillicores</code>/<code class=\"inline\">MemoryBytes</code> are summed across every GameServer pod in the fleet, <code class=\"inline\">PodsMeasured</code> is a count. There is **no <code class=\"inline\">PodName</code>/<code class=\"inline\">GameServerName</code>/per-instance identity in metrics today**. The package doc comment (<code class=\"inline\">metrics.go</code> lines 1-21) confirms this is deliberate for now (&quot;Fleet aggregate counts... Collector polls on an interval&quot;) and explicitly flags &quot;retention/rollup of old snapshots... a known gap&quot; — already partially addressed by an hourly-rollup GC (<code class=\"inline\">RollupAndPrune</code>/<code class=\"inline\">RunGC</code>, time-based, not count-based, see below).</p><p>**<code class=\"inline\">incidentView</code>** (lines 254-279) — backs <code class=\"inline\">GET /games/{id}/incidents</code>, **is already per-pod**:<br>\u0000FENCE6\u0000</p><p>**NULL semantics convention**: pointer fields (<code class=\"inline\">*int64</code>, <code class=\"inline\">*int</code>, <code class=\"inline\">*string</code>) with <code class=\"inline\">omitempty</code> — a <code class=\"inline\">nil</code> in Go means the JSON key is **absent from the response entirely** (not <code class=\"inline\">null</code>, not <code class=\"inline\">0</code>), and the frontend (per <code class=\"inline\">INDIE_UI_MAP.md</code>) is required to render an explicit &quot;no metrics-server&quot; / &quot;player counter not connected&quot; message rather than treat the missing key as zero. Three resource fields (<code class=\"inline\">CPUMillicores</code>/<code class=\"inline\">MemoryBytes</code>/<code class=\"inline\">PodsMeasured</code>) are documented as **all-nil-together** (one boolean condition, not three independent ones) while <code class=\"inline\">PlayersConnected</code> is independently nilable. <code class=\"inline\">ExitCode</code>/<code class=\"inline\">LogTail</code> follow the same pointer+omitempty pattern in incidents.</p><p>**Domain structs behind these DTOs**:<br>- <code class=\"inline\">metrics.Snapshot</code> (<code class=\"inline\">/home/ihar/Games/coordinator/internal/coordinator/metrics/metrics.go:40-53</code>): <code class=\"inline\">ClusterID, GameID, FleetName, DesiredReplicas, ReadyReplicas, ReservedReplicas, AllocatedReplicas, CPUMillicores *int64, MemoryBytes *int64, PodsMeasured *int, PlayersConnected *int, CollectedAt time.Time</code>.<br>- <code class=\"inline\">incidents.Incident</code> (<code class=\"inline\">/home/ihar/Games/coordinator/internal/coordinator/incidents/incident.go:27-45</code>): <code class=\"inline\">ID, ClusterID, GameID *uuid.UUID, GameServerName, PodName, ContainerName, Category, Reason, Message, ExitCode *int32, LogTail *string, OccurredAt, CreatedAt</code>.</p><p>**Retention today**: <code class=\"inline\">metrics.Repository.RollupAndPrune</code>/<code class=\"inline\">RunGC</code> (<code class=\"inline\">/home/ihar/Games/coordinator/internal/coordinator/metrics/repository.go:116-204</code>) is **time-based** (hourly rollup + prune past a <code class=\"inline\">retention</code> duration), not count-based per anything. <code class=\"inline\">incidents.Repository</code> has no GC/retention method at all currently — only <code class=\"inline\">Create</code>/<code class=\"inline\">ListByGame</code>. Your planned &quot;count-based retention, last N instances per game&quot; would be a new pattern, not reuse of an existing one.</p><p>## 4. <code class=\"inline\">INDIE_UI_MAP.md</code> — full API registry &amp;amp; cache-key tables</p><p>File: <code class=\"inline\">/home/ihar/Games/coordinator/INDIE_UI_MAP.md</code></p><p>**&quot;Чек-лист функциональной полноты (ручка → экран)&quot;** table (lines 41-64) — reproduced in full:</p><p>| Ручка | Экран/виджет | Готово в UI |<br>|---|---|---|<br>| POST /auth/register, /login, /logout | /login, шапка | ✅ |<br>| GET/POST /games, GET/PATCH/DELETE /games/{id} | список игр, Settings, danger zone | ✅ |<br>| POST /games/{id}/api-key | Settings → API-ключ | ✅ |<br>| PUT/GET/DELETE /games/{id}/regions/{region} | Settings → регионы | ✅ |<br>| GET /games/{id}/regions/{region}/status | Overview → деплой по регионам | ✅ |<br>| POST /games/{id}/builds + complete (multipart в S3) | Builds → аплоадер | 🟡 код+тесты ✅, живой S3/CORS ⬜ |<br>| GET /games/{id}/builds, GET .../{build_id} | Builds → версии | ✅ |<br>| POST .../activate, POST .../deactivate, DELETE .../{build_id} | Builds → активация/деактивация/удаление | ✅ |<br>| PATCH .../builds/{build_id} (launch_command) | Builds → «Изменить» у строки запуска | ✅ |<br>| POST /games/{id}/launch, /stop | Overview → LaunchControls | ✅ |<br>| GET /games/{id}/sessions?status= | Overview → живые сессии | ✅ |<br>| POST .../sessions/{sid}/restart | Overview → сессии → «Перезапустить…» | ✅ |<br>| GET .../sessions/{sid}/logs/stream (SSE) | Overview → LogDrawer | ✅ |<br>| GET /games/{id}/incidents | Monitoring → инциденты | ✅ |<br>| GET /games/{id}/metrics (?limit / ?since) | Monitoring → графики | ✅ (<code class=\"inline\">?since=</code>) |<br>| GET /tariffs | Settings → регионы (лимиты buffer/max_regions текущего тарифа); карточки выбора тарифа убраны 2026-07-12 | ✅ |<br>| PATCH /games/{id} (<code class=\"inline\">instance_size</code>) | Settings → тариф → размер инстанса S/M/L/XL | ✅ |<br>| GET /account/balance | шапка списка игр → баланс + burn rate + Top up | ✅ |<br>| GET /presets | Presets (страница), Builds → PresetPicker | ✅ |<br>| GET /presets/{id}/client-download?os= | Presets, Builds → PresetPicker → «Download client» | ✅ |<br>| POST /games/{id}/builds/from-preset | Presets, Builds → PresetPicker → «Use as server build» | ✅ |<br>| GET /events (SSE) | глобальный SSE-модуль → кэш | ✅ |</p><p>**&quot;Реестр ключей кэша&quot;** table (lines 91-104) — reproduced in full:</p><p>| Ключ кэша | REST | Актуализация | Кто читает |<br>|---|---|---|---|<br>| <code class=\"inline\">[&#x27;games&#x27;]</code> | <code class=\"inline\">GET /games</code> | ⬜ поллинг (триггера на <code class=\"inline\">games</code> нет) | список игр, шапка игры |<br>| <code class=\"inline\">[&#x27;builds&#x27;, gameId]</code> | <code class=\"inline\">GET /games/{id}/builds</code> | ✅ SSE <code class=\"inline\">builds</code> (миграция 000026) | вкладка builds, бейдж активного билда |<br>| <code class=\"inline\">[&#x27;deploy&#x27;, gameId, region]</code> | <code class=\"inline\">GET /games/{id}/regions/{region}/status</code> | ⬜ поллинг ~3–5с пока идёт деплой | overview: live-статус деплоя |<br>| <code class=\"inline\">[&#x27;sessions&#x27;, gameId]</code> | <code class=\"inline\">GET /games/{id}/sessions?status=...</code> | ⬜ поллинг (кандидат №1 на следующий триггер) | overview: живые сессии |<br>| <code class=\"inline\">[&#x27;incidents&#x27;, gameId]</code> | <code class=\"inline\">GET /games/{id}/incidents</code> | ⬜ поллинг (кандидат №2) | monitoring |<br>| <code class=\"inline\">[&#x27;metrics&#x27;, gameId, since]</code> | <code class=\"inline\">GET /games/{id}/metrics?since=</code> | поллинг 30с == тику коллектора | monitoring: графики |<br>| <code class=\"inline\">[&#x27;regions&#x27;, gameId]</code> | <code class=\"inline\">GET /games/{id}/regions</code> | мутации из UI → инвалидация после ответа | settings, overview |<br>| <code class=\"inline\">[&#x27;tariffs&#x27;]</code> | <code class=\"inline\">GET /tariffs</code> | статика (staleTime ∞) | settings, регистрация |<br>| <code class=\"inline\">[&#x27;presets&#x27;]</code> | <code class=\"inline\">GET /presets</code> | статика (staleTime ∞) | страница Presets, Builds → PresetPicker |<br>| <code class=\"inline\">[&#x27;account-balance&#x27;]</code> | <code class=\"inline\">GET /account/balance</code> | SSE-scope <code class=\"inline\">account-balance</code> (миграция 000041) | шапка списка игр, <code class=\"inline\">LowBalanceBanner</code> |<br>| <code class=\"inline\">[&#x27;test-instance&#x27;, gameId]</code> | <code class=\"inline\">GET /games/{id}/test-instance</code> (404 = «не запущен») | поллинг 3с, только пока инстанс существует | Builds → TestInstancePanel |<br>| <code class=\"inline\">[&#x27;available-regions&#x27;]</code> | <code class=\"inline\">GET /regions</code> | react-query дефолт | Settings → селект добавления региона |</p><p>Both tables end with an explicit statement that this is &quot;the only table of correspondences in the system; new widgets are required to fetch data through it, new rows are to be added here&quot; — so a new per-instance-history endpoint must add one row to each table plus a &quot;Экраны: состав виджетов&quot; entry, per the file&#x27;s own convention.</p><p>Also relevant, from the Monitoring section (line 126): *&quot;NULL-семантика на экране: «нет metrics-server» / «счётчик игроков не подключён» — тексты вместо графика, ноль рисуется как данные.&quot;* — the NULL-vs-zero distinction is treated as a UI requirement, not just a backend nuance.</p><p>## 5. Existing per-instance/per-pod identifier concept in dashboardapi</p><p>Grep across <code class=\"inline\">internal/coordinator/dashboardapi/</code> for <code class=\"inline\">PodName</code>, <code class=\"inline\">GameServerName</code>, <code class=\"inline\">InstanceID</code>:</p><p>- <code class=\"inline\">PodName</code> and <code class=\"inline\">GameServerName</code> **already exist**, but only in <code class=\"inline\">incidentView</code> (dto.go:259-260) — i.e., only incidents are pod-scoped today.<br>- <code class=\"inline\">sessionView.GameServerName</code> (dto.go:230) is a *session*-scoped optional field (&quot;what restart/log-stream act on&quot;), not a first-class per-instance history concept.<br>- <code class=\"inline\">gameServerStatusView.Name</code> (dto.go:180) is the live (non-persisted) per-GameServer status from <code class=\"inline\">GET /games/{id}/regions/{region}/status</code> (backed by <code class=\"inline\">agones.FleetDeployStatus</code>), used by the log-stream route <code class=\"inline\">GET /games/{id}/regions/{region}/instances/{instance}/logs/stream</code> and simulate route — these use a path param literally named <code class=\"inline\">{instance}</code> (handlers.go:729-754, 96-97 in server.go) which is actually the GameServer name string, not a stored/queryable &quot;instance id&quot; — this is the closest existing naming convention (<code class=\"inline\">instance</code> in the URL path) for what you&#x27;d be building.<br>- <code class=\"inline\">InstanceID</code> — **no matches anywhere** in dashboardapi. There is no persisted, queryable, historical &quot;instance&quot; entity today; <code class=\"inline\">metrics.Snapshot</code> is fleet-level (no pod identity at all) and <code class=\"inline\">incidents.Incident</code> carries <code class=\"inline\">GameServerName</code>/<code class=\"inline\">PodName</code> per row but has no notion of &quot;instance lifecycle&quot; grouping/retention — each incident row is a standalone terminal event, not linked to a broader per-instance metrics/log history object.</p><p>**Implication for your planned endpoint**: there is no existing per-instance domain/table to extend. You&#x27;d likely need (a) a new persisted concept correlating <code class=\"inline\">GameServerName</code>/<code class=\"inline\">PodName</code> across metrics collection (which currently only aggregates at fleet level) and incidents, and (b) a new count-based retention mechanism (existing GC in <code class=\"inline\">metrics</code> package is time-based hourly rollup, not count-based per key) — both are genuinely new pieces of infrastructure, not just a new read endpoint over existing tables.&lt;/result&gt;<br>&lt;usage&gt;&lt;subagent_tokens&gt;64247&lt;/subagent_tokens&gt;&lt;tool_uses&gt;12&lt;/tool_uses&gt;&lt;duration_ms&gt;81196&lt;/duration_ms&gt;&lt;/usage&gt;<br>&lt;/task-notification&gt;</p>",
     "ts": "2026-07-12T20:42:19.524Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Второй агент (API-слой) тоже готов — жду третий, по UI-компонентам, потом сажусь синтезировать план.</p>",
+    "ts": "2026-07-12T20:42:22.585Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>&lt;task-notification&gt;<br>&lt;task-id&gt;a0f4a888af55d7457&lt;/task-id&gt;<br>&lt;tool-use-id&gt;toolu_01NAG3gvVQXzVjqZyGd3AHqW&lt;/tool-use-id&gt;<br>&lt;output-file&gt;/tmp/claude-1000/-home-ihar-Games-coordinator/c9fbb019-ca4a-4c09-9c68-b391f5b74ce1/tasks/a0f4a888af55d7457.output&lt;/output-file&gt;<br>&lt;status&gt;completed&lt;/status&gt;<br>&lt;summary&gt;Agent &quot;Explore dashboardui Monitoring/Incidents components&quot; finished&lt;/summary&gt;<br>&lt;note&gt;A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.&lt;/note&gt;<br>&lt;result&gt;No existing &quot;instance history&quot; concept in the codebase — this would be a genuinely new feature. Here is my full report.</p><p>## 1. Monitoring tab component</p><p>**File:** <code class=\"inline\">/home/ihar/Games/coordinator/dashboardui/src/features/monitoring/MonitoringTab.tsx</code> (plus helpers <code class=\"inline\">MetricChart.tsx</code> and <code class=\"inline\">metrics.ts</code> in the same directory).</p><p>- **Fetching:** <code class=\"inline\">useQuery({ queryKey: [&#x27;metrics&#x27;, gameId, window], queryFn: () =&amp;gt; api&amp;lt;{ metrics: MetricSnapshot[] }&amp;gt;(&#x27;GET&#x27;, /games/${gameId}/metrics?since=...) , refetchInterval: 30_000 })</code>. Window is <code class=\"inline\">&#x27;1h&#x27; | &#x27;24h&#x27;</code> (<code class=\"inline\">WindowKey</code> in <code class=\"inline\">metrics.ts</code>), <code class=\"inline\">since</code> is computed at request time (UTC ISO, <code class=\"inline\">sinceFor()</code>), so the key stays stable. Poll interval (30s) matches the backend metrics-collector tick — comment explicitly says push is pointless since the source itself ticks.<br>- **Series building:** <code class=\"inline\">buildSeries(snapshots, pick)</code> in <code class=\"inline\">metrics.ts</code> groups <code class=\"inline\">MetricSnapshot[]</code> by <code class=\"inline\">collected_at</code> timestamp and by <code class=\"inline\">fleet_name</code> (comment: &quot;серия = fleet&quot; — a chart line is a fleet, not an instance). Produces <code class=\"inline\">ChartSeries { fleets: string[], rows: Array&amp;lt;{t, [fleet]: number|null}&amp;gt;, allNull: boolean }</code>. <code class=\"inline\">SERIES_COLORS</code> is a fixed categorical palette, color follows the fleet identity (sorted), not positional index.<br>- **Rendering:** <code class=\"inline\">MetricChart.tsx</code> uses recharts (<code class=\"inline\">LineChart</code>, fixed <code class=\"inline\">width={560} height={170}</code>, not <code class=\"inline\">ResponsiveContainer</code>, for deterministic jsdom tests — overflow-x-auto wrapper instead). One <code class=\"inline\">&amp;lt;Line&amp;gt;</code> per fleet; <code class=\"inline\">&amp;lt;Legend&amp;gt;</code> only rendered when <code class=\"inline\">series.fleets.length &amp;gt; 1</code> (single series names itself via the chart title).<br>- **NULL-semantics:** when <code class=\"inline\">series.allNull</code> is true, <code class=\"inline\">MetricChart</code> renders a text <code class=\"inline\">emptyNote</code> instead of the chart (<code class=\"inline\">&amp;lt;p&amp;gt;{emptyNote}&amp;lt;/p&amp;gt;</code>). <code class=\"inline\">MonitoringTab</code> passes per-chart empty notes: <code class=\"inline\">t(&#x27;monitoring.noMetricsServer&#x27;)</code> for CPU/RAM, <code class=\"inline\">t(&#x27;monitoring.noPlayerCounter&#x27;)</code> for players, literal <code class=\"inline\">&quot;—&quot;</code> for ready replicas. This matches CLAUDE.md&#x27;s explicit rule: a missing value renders as explanatory text, never as a zero data point (<code class=\"inline\">monitoring.ts</code>&#x27;s <code class=\"inline\">buildSeries</code> distinguishes <code class=\"inline\">null</code>/<code class=\"inline\">undefined</code> from an actual <code class=\"inline\">0</code>).<br>- **Incidents** are rendered on the same tab, in <code class=\"inline\">IncidentsSection</code> (bottom half of <code class=\"inline\">MonitoringTab.tsx</code>), not a separate route/tab.</p><p>## 2. Incidents UI / expandable log_tail</p><p>Same file, function <code class=\"inline\">IncidentsSection</code> in <code class=\"inline\">MonitoringTab.tsx</code> (lines ~90-145).</p><p>- **Fetch:** <code class=\"inline\">useQuery({ queryKey: [&#x27;incidents&#x27;, gameId], queryFn: () =&amp;gt; api&amp;lt;{incidents: Incident[]}&amp;gt;(&#x27;GET&#x27;, /games/${gameId}/incidents) })</code> — no poll currently (registry marks it &quot;⬜ поллинг — кандидат №2 для SSE-триггера&quot;, i.e. planned but not wired yet).<br>- **Expandable log tail pattern:** native HTML <code class=\"inline\">&amp;lt;details&amp;gt;</code>/<code class=\"inline\">&amp;lt;summary&amp;gt;</code>, not a custom component:<br>\u0000FENCE0\u0000<br>This three-way distinction (<code class=\"inline\">log_tail == null</code> → &quot;couldn&#x27;t capture the log&quot;, <code class=\"inline\">log_tail === &#x27;&#x27;</code> → &quot;(container printed nothing)&quot;, <code class=\"inline\">log_tail</code> non-empty → shown) is the pattern to reuse for a per-instance history log excerpt.</p><p>Separately, there is a **live-tail** component (different concept, real-time streaming, not stored history): <code class=\"inline\">/home/ihar/Games/coordinator/dashboardui/src/features/overview/LogDrawer.tsx</code>, used from <code class=\"inline\">DeployStatusWidget.tsx</code> via <code class=\"inline\">EventSource</code> against <code class=\"inline\">GET .../instances/{name}/logs/stream</code>. Not directly reusable for a static &quot;past instance log excerpt&quot; but shows the existing per-instance-log affordance (a &quot;Logs&quot; button per <code class=\"inline\">GameServerRow</code>, <code class=\"inline\">t(&#x27;deploy.instanceLogs&#x27;)</code>).</p><p>## 3. API types (<code class=\"inline\">/home/ihar/Games/coordinator/dashboardui/src/api/types.ts</code>)</p><p>Header comment: types mirror <code class=\"inline\">internal/coordinator/dashboardapi/dto.go</code> 1:1 by JSON tag, manually kept in sync (no codegen yet).</p><pre><code>export interface Incident {\n  id: string\n  gameserver_name: string\n  pod_name: string\n  container_name: string\n  category: string\n  reason: string\n  message: string\n  exit_code?: number\n  log_tail?: string\n  occurred_at: string\n}\n\nexport interface MetricSnapshot {\n  fleet_name: string\n  desired_replicas: number\n  ready_replicas: number\n  reserved_replicas: number\n  allocated_replicas: number\n  cpu_millicores?: number\n  memory_bytes?: number\n  pods_measured?: number\n  players_connected?: number\n  collected_at: string\n}\n</code></pre><p>Also relevant for a per-instance history type — the live equivalents already keyed by GameServer/pod name:</p><pre><code>export interface GameServerStatus {\n  name: string\n  state: string\n  ip?: string\n  port?: number\n  pod_waiting_reason?: string\n  pod_waiting_message?: string\n  unexpected_listening_ports?: number[]\n  match_started?: boolean\n  players_connected?: number\n}\n</code></pre><p>An &quot;instance history&quot; DTO would plausibly need to combine identity fields already used in <code class=\"inline\">Incident</code>/<code class=\"inline\">GameServerStatus</code> (<code class=\"inline\">gameserver_name</code>/<code class=\"inline\">pod_name</code>, <code class=\"inline\">region</code> — see <code class=\"inline\">Session.region</code>), a terminal state/exit reason, a truncated <code class=\"inline\">log_tail</code>-shaped field, a timestamp range (start/end), and an embedded or linked metrics snapshot (shape matching <code class=\"inline\">MetricSnapshot</code> minus <code class=\"inline\">fleet_name</code>/replica fields, or a reduced subset like cpu/ram/players at last-seen).</p><p>**Client:** single <code class=\"inline\">api&amp;lt;T&amp;gt;(method, path, body?)</code> in <code class=\"inline\">/home/ihar/Games/coordinator/dashboardui/src/api/client.ts</code> — all requests go through this, prefixes <code class=\"inline\">/dashboard</code>, <code class=\"inline\">credentials: &#x27;same-origin&#x27;</code>, throws <code class=\"inline\">ApiError(status, code, message)</code> parsed from the backend&#x27;s <code class=\"inline\">{error: {code, message}}</code> envelope. No per-feature client wrappers; queries call <code class=\"inline\">api()</code> directly inline (see <code class=\"inline\">MonitoringTab.tsx</code> above) — a new instance-history fetch would follow the same inline pattern, no separate <code class=\"inline\">api/incidents.ts</code> file exists.</p><p>## 4. i18n keys (<code class=\"inline\">/home/ihar/Games/coordinator/dashboardui/src/i18n/en.ts</code>)</p><p>Monitoring block (lines 237-249):<br>\u0000FENCE3\u0000</p><p>Incidents block (lines 251-260):<br>\u0000FENCE4\u0000</p><p>Other relevant existing keys: <code class=\"inline\">game.tabMonitoring: &#x27;Monitoring&#x27;</code> (tab label, line 65), <code class=\"inline\">deploy.instanceLogs: &#x27;Logs&#x27;</code> (line 167), <code class=\"inline\">testInstance.*</code> (per-instance test-launch panel strings), <code class=\"inline\">logs.connecting/live/closed/waiting</code> (used by <code class=\"inline\">LogDrawer</code>). No <code class=\"inline\">instance.*</code> namespace exists yet — a new &quot;instance history&quot; section should probably introduce its own top-level key prefix (e.g. <code class=\"inline\">instanceHistory.*</code> or <code class=\"inline\">monitoring.instances.*</code>) rather than overloading <code class=\"inline\">monitoring.*</code>/<code class=\"inline\">incidents.*</code>, following the existing convention of one flat key-namespace per feature/section with a leading Russian comment header (<code class=\"inline\">// мониторинг</code>, <code class=\"inline\">// инциденты</code>) grouping each block. CLAUDE.md mandates: no bare strings in JSX, all UI text via <code class=\"inline\">t(&#x27;key&#x27;, params?)</code>, English strings, <code class=\"inline\">en.ts</code> is the canonical dictionary (also copied into <code class=\"inline\">admindashboardui</code>).</p><p>## 5. Routing / tabs pattern (<code class=\"inline\">GamePage</code>)</p><p>**File:** <code class=\"inline\">/home/ihar/Games/coordinator/dashboardui/src/pages/GamePage.tsx</code></p><p>Tabs are a flat array plus matching <code class=\"inline\">&amp;lt;Route&amp;gt;</code>s inside a <code class=\"inline\">&amp;lt;Routes&amp;gt;</code> block, both driven by the same <code class=\"inline\">path</code> values:</p><pre><code>const tabs = [\n  { path: &#x27;&#x27;, label: () =&amp;gt; t(&#x27;game.tabOverview&#x27;) },\n  { path: &#x27;builds&#x27;, label: () =&amp;gt; t(&#x27;game.tabBuilds&#x27;) },\n  { path: &#x27;monitoring&#x27;, label: () =&amp;gt; t(&#x27;game.tabMonitoring&#x27;) },\n  { path: &#x27;settings&#x27;, label: () =&amp;gt; t(&#x27;game.tabSettings&#x27;) },\n]\n...\n&amp;lt;NavLink\n  key={tab.path}\n  to={tab.path === &#x27;&#x27; ? `/games/${gameId}` : `/games/${gameId}/${tab.path}`}\n  end={tab.path === &#x27;&#x27;}\n  ...\n&amp;gt;\n...\n&amp;lt;Routes&amp;gt;\n  &amp;lt;Route index element={&amp;lt;OverviewTab /&amp;gt;} /&amp;gt;\n  &amp;lt;Route path=&quot;builds&quot; element={&amp;lt;BuildsTab /&amp;gt;} /&amp;gt;\n  &amp;lt;Route path=&quot;monitoring&quot; element={&amp;lt;MonitoringTab /&amp;gt;} /&amp;gt;\n  &amp;lt;Route path=&quot;settings&quot; element={&amp;lt;SettingsTab /&amp;gt;} /&amp;gt;\n&amp;lt;/Routes&amp;gt;\n</code></pre><p>Critical constraint (explicit code comment + CLAUDE.md line: *&quot;Ссылки табов на таких страницах — только абсолютные (GamePage)&quot;*): <code class=\"inline\">GamePage</code> lives on a splat route <code class=\"inline\">/games/:gameId/*</code>, and in react-router v7 a relative <code class=\"inline\">to</code> inside a splat route resolves against the **full current URL including the splat tail** — so from <code class=\"inline\">/games/g1/builds</code>, a relative <code class=\"inline\">to=&quot;monitoring&quot;</code> would incorrectly resolve to <code class=\"inline\">/games/g1/builds/monitoring</code>. All tab <code class=\"inline\">NavLink</code>s must therefore build absolute paths (<code class=\"inline\">/games/${gameId}/...</code>), never relative ones.</p><p>For a new per-instance history feature, two wiring options fit this pattern:<br>- **New sub-tab inside Monitoring** (no <code class=\"inline\">GamePage</code> changes needed): add a third section/sub-nav inside <code class=\"inline\">MonitoringTab.tsx</code> itself (similar to the existing 1h/24h window toggle buttons), or a new component rendered alongside <code class=\"inline\">IncidentsSection</code>.<br>- **New top-level tab**: add an entry to the <code class=\"inline\">tabs</code> array (<code class=\"inline\">{ path: &#x27;instances&#x27;, label: () =&amp;gt; t(&#x27;game.tabInstances&#x27;) }</code>) and a matching <code class=\"inline\">&amp;lt;Route path=&quot;instances&quot; element={&amp;lt;InstanceHistoryTab /&amp;gt;} /&amp;gt;</code>, with the new component under a new <code class=\"inline\">src/features/instances/</code> (or similar) directory, following the same <code class=\"inline\">useQuery</code> + <code class=\"inline\">api()</code> + i18n conventions shown above. Given INDIE_UI_MAP.md&#x27;s registry-driven approach (&quot;новые виджеты берут данные только через её реестр&quot;), any new query key (e.g. <code class=\"inline\">[&#x27;instance-history&#x27;, gameId, ...]</code>) should also be added to the cache-key registry table in <code class=\"inline\">/home/ihar/Games/coordinator/INDIE_UI_MAP.md</code>.&lt;/result&gt;<br>&lt;usage&gt;&lt;subagent_tokens&gt;43779&lt;/subagent_tokens&gt;&lt;tool_uses&gt;19&lt;/tool_uses&gt;&lt;duration_ms&gt;75105&lt;/duration_ms&gt;&lt;/usage&gt;<br>&lt;/task-notification&gt;</p>",
+    "ts": "2026-07-12T20:42:24.737Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>[Request interrupted by user]</p>",
+    "ts": "2026-07-12T20:46:31.821Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>добавь туда же запущенные инстансы</p>",
+    "ts": "2026-07-12T20:46:56.790Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Миграция готова. Теперь перехожу к переименованию Go-пакета <code class=\"inline\">incidents</code> → <code class=\"inline\">instances</code>.</p>",
+    "ts": "2026-07-12T20:51:54.262Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь watcher.go — с расширенной логикой (снят фильтр exit code 0, добавлена ветка UpsertRunning):</p>",
+    "ts": "2026-07-12T20:55:36.792Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — <code class=\"inline\">Exporter</code> ещё не создан в новом пакете. Пишу exporter.go.</p>",
+    "ts": "2026-07-12T20:56:09.484Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь удаляю старый пакет <code class=\"inline\">incidents</code> и обновляю <code class=\"inline\">metrics.Collector</code>.</p>",
+    "ts": "2026-07-12T20:58:16.252Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю <code class=\"inline\">collectOnce</code> и <code class=\"inline\">collectResourceUsage</code>:</p>",
+    "ts": "2026-07-12T20:59:25.768Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — сейчас переопределю <code class=\"inline\">collectResourceUsage</code> в <code class=\"inline\">aggregateResourceUsage</code> и добавлю вызов <code class=\"inline\">upsertInstanceSnapshots</code>.</p>",
+    "ts": "2026-07-12T20:59:38.212Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, всё срослось корректно. Теперь нужно обновить <code class=\"inline\">collector_test.go</code> под новую сигнатуру <code class=\"inline\">New</code> (добавлен параметр <code class=\"inline\">instances</code>) и добавить fake для <code class=\"inline\">InstanceStore</code>.</p>",
+    "ts": "2026-07-12T21:00:01.148Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All identical patterns — use <code class=\"inline\">replace_all</code> for the two variants.</p>",
+    "ts": "2026-07-12T21:00:14.528Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю отдельный тест сразу после этого, использующий именованный <code class=\"inline\">fakeInstanceStore</code> для проверки апсертов по каждому поду:</p>",
+    "ts": "2026-07-12T21:00:28.540Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь dashboardapi: server.go, dto.go, handlers.go.</p>",
+    "ts": "2026-07-12T21:01:15.108Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь маршрут в <code class=\"inline\">Handler()</code>:</p>",
+    "ts": "2026-07-12T21:01:39.414Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — теперь пишу <code class=\"inline\">handleListInstances</code> в handlers.go и <code class=\"inline\">instanceView</code> в dto.go.</p>",
+    "ts": "2026-07-12T21:01:44.803Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю комментарии в <code class=\"inline\">launcher/logs.go</code> и <code class=\"inline\">units/meter.go</code>, затем перейду к <code class=\"inline\">wiring.go</code> и <code class=\"inline\">handlers_test.go</code>.</p>",
+    "ts": "2026-07-12T21:03:40.963Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">wiring.go</code>:</p>",
+    "ts": "2026-07-12T21:03:58.981Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">startBackgroundLoops</code> — Watcher, Collector и RunGC:</p>",
+    "ts": "2026-07-12T21:04:51.420Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Небольшая корректировка переноса строки:</p>",
+    "ts": "2026-07-12T21:05:03.779Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю RunGC-цикл для instances рядом с metrics GC:</p>",
+    "ts": "2026-07-12T21:05:16.568Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — теперь добавляю поля в <code class=\"inline\">config.go</code>.</p>",
+    "ts": "2026-07-12T21:05:24.090Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю <code class=\"inline\">handlers_test.go</code>:</p>",
+    "ts": "2026-07-12T21:05:47.082Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь смотрю на сами тесты Incidents (строки ~1267-1340) и переписываю их под новый API:</p>",
+    "ts": "2026-07-12T21:06:16.372Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, чисто. Теперь проверю весь репозиторий на оставшиеся ссылки на <code class=\"inline\">incidents</code> и прогоню <code class=\"inline\">go build</code>/<code class=\"inline\">go vet</code>/<code class=\"inline\">gofmt</code>.</p>",
+    "ts": "2026-07-12T21:06:56.003Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все три — просто устаревшие имена в комментариях, поправлю на актуальные:</p>",
+    "ts": "2026-07-12T21:07:12.999Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь отмечаю задачи 5 и 6 выполненными и прогоняю сборку/тесты.</p>",
+    "ts": "2026-07-12T21:07:27.336Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>gofmt отработал чисто. Теперь полная сборка и тесты.</p>",
+    "ts": "2026-07-12T21:08:05.020Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Сборка прошла чисто. Теперь <code class=\"inline\">go vet</code> и полный набор тестов.</p>",
+    "ts": "2026-07-12T21:08:12.692Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">go vet</code> чист. Теперь полный <code class=\"inline\">go test ./...</code>:</p>",
+    "ts": "2026-07-12T21:08:40.957Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь перепишу тест, чтобы вызывать <code class=\"inline\">PruneCompleted</code> напрямую (без гонки с горутиной), плюс отдельный минимальный тест на остановку <code class=\"inline\">RunGC</code> по отмене контекста — по образцу <code class=\"inline\">metrics</code>:</p>",
+    "ts": "2026-07-12T21:10:14.355Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь пересоберу и перезапущу тесты:</p>",
+    "ts": "2026-07-12T21:10:31.904Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все тесты <code class=\"inline\">instances</code> зелёные. Прогоняю полный <code class=\"inline\">go test ./...</code> ещё раз для финальной проверки.</p>",
+    "ts": "2026-07-12T21:11:28.832Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полный <code class=\"inline\">go test ./...</code> зелёный, никаких сбоев. Backend-часть готова.</p>",
+    "ts": "2026-07-12T21:11:38.673Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь en.ts — блоки <code class=\"inline\">monitoring.*</code>/<code class=\"inline\">incidents.*</code>:</p>",
+    "ts": "2026-07-12T21:13:27.922Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю тесты <code class=\"inline\">MonitoringTab.test.tsx</code> под новый эндпоинт/секцию:</p>",
+    "ts": "2026-07-12T21:14:30.586Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь запускаю фронтовые тесты <code class=\"inline\">dashboardui</code>:</p>",
+    "ts": "2026-07-12T21:15:09.561Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 96 тестов зелёные. Проверю ещё TypeScript-компиляцию (<code class=\"inline\">tsc -b</code>):</p>",
+    "ts": "2026-07-12T21:15:20.100Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто. Обновляю <code class=\"inline\">INDIE_UI_MAP.md</code>.</p>",
+    "ts": "2026-07-12T21:15:27.496Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю раздел «7. Metrics &amp; logs pipeline» и связанные упоминания:</p>",
+    "ts": "2026-07-12T21:16:51.875Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь остальные упоминания в PROJECT_MAP.md, WHATIF.md и CLAUDE.md:</p>",
+    "ts": "2026-07-12T21:17:07.221Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">WHATIF.md</code>:</p>",
+    "ts": "2026-07-12T21:17:22.490Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">CLAUDE.md</code>:</p>",
+    "ts": "2026-07-12T21:17:40.435Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Документация обновлена. Отмечаю задачу 9 выполненной и перехожу к финальной проверке.</p>",
+    "ts": "2026-07-12T21:18:32.636Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Реализация готова, все автоматические проверки зелёные:</p><p>- <code class=\"inline\">go build</code>, <code class=\"inline\">go vet</code>, <code class=\"inline\">gofmt -l .</code>, полный <code class=\"inline\">go test ./...</code> (не <code class=\"inline\">-short</code> — миграция схемы) — чисто.<br>- <code class=\"inline\">dashboardui</code>: 96 vitest-тестов зелёные, <code class=\"inline\">tsc -b</code> без ошибок.<br>- <code class=\"inline\">INDIE_UI_MAP.md</code>, <code class=\"inline\">PROJECT_MAP.md</code>, <code class=\"inline\">WHATIF.md</code>, <code class=\"inline\">CLAUDE.md</code>, <code class=\"inline\">design/BRIEF.md</code> — обновлены под новую структуру.</p><p>**Что не проверено живьём**: у вас уже поднят <code class=\"inline\">make dev-stack</code> (процессы Vite с 16:56, coordinator отвечает на <code class=\"inline\">:18080/healthz</code>) — я его не трогал, чтобы не сорвать текущую сессию. Новая миграция 000043 применится только при рестарте локального coordinator-бинаря. Если хотите живую проверку (запустить Test Launch → увидеть инстанс «running» в новой секции Monitoring → остановить → увидеть <code class=\"inline\">normal_exit</code> с логом) — скажите, я пересоберу и перезапущу стек сам, либо сделайте <code class=\"inline\">make dev-stack-stop &amp;&amp; make dev-stack</code> и проверьте вручную.</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-12T21:20:01.083Z"
   }
 ]
