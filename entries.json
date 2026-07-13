@@ -22511,5 +22511,29 @@
     "who": "claude",
     "html": "<p>Потому что ephemeral-storage лимит — это не мгновенный kernel-лимит, как у RAM. Разница:</p><p>- **RAM**: cgroup-лимит, OOM killer убивает процесс синхронно, в момент попытки выделить память сверх лимита.<br>- **Ephemeral storage**: лимит проверяет **kubelet раз в интервал** (штатно ~10с, через тот же цикл, что собирает cAdvisor-статистику) — сканирует диск, сравнивает с лимитом, и только тогда решает эвиктить под. Это polling, не hard-enforcement на уровне записи в файл.</p><p>А <code class=\"inline\">fakegame</code>&#x27;s <code class=\"inline\">storageLoop</code> (<code class=\"inline\">deploy/local/fakegame/main.go:200-224</code>) пишет 10MiB-чанки с <code class=\"inline\">fsync</code> **в тесном цикле без единого sleep** — ничего не тормозит запись между двумя проверками kubelet&#x27;а. Поэтому за один интервал опроса под успевает пробить лимит в 1Gi и улететь дальше — в вашем скрине это видно буквально по логам: 2010→3210MiB, то есть контейнер продолжал писать ещё больше секунды-двух после многократного превышения 1Gi, пока kubelet не подловил его на следующем цикле и не вынес вердикт <code class=\"inline\">Evicted</code>.</p><p>Итог: это ожидаемое поведение самого механизма evict&#x27;а в k8s, не баг вашего кода — лимит защищает от постоянного превышения (шумный сосед не будет жрать диск бесконечно), но не гарантирует мгновенную остановку в момент пересечения порога.</p>",
     "ts": "2026-07-13T20:23:42.448Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сейчас тестовый инстанс не отображается во вкладке monitoring</p>",
+    "ts": "2026-07-13T20:32:23.195Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>[Request interrupted by user]</p>",
+    "ts": "2026-07-13T20:35:46.791Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>то воспроизводится , то нет, странное поведение</p>",
+    "ts": "2026-07-13T20:39:04.122Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл настоящую причину — это не совпадение, а гонка в самом механизме отслеживания подов.</p><p>**Подтверждено по БД** (<code class=\"inline\">gameserver_instances</code> для игры <code class=\"inline\">fce98936...</code>): у всех 10 инстансов Fleet&#x27;а <code class=\"inline\">started_at</code>/<code class=\"inline\">container_started_at</code> заполнены нормально, а у <code class=\"inline\">test-fce98936-...</code> (тестовый инстанс) — оба поля <code class=\"inline\">NULL</code>, при этом сам под живёт уже больше 100 секунд и реально <code class=\"inline\">Ready</code>/<code class=\"inline\">3/3 Running</code> в кластере. Строка в таблице вообще есть — но её создал не <code class=\"inline\">Watcher</code> (<code class=\"inline\">UpsertRunning</code>), а <code class=\"inline\">metrics.Collector</code> (<code class=\"inline\">UpsertMetrics</code>/<code class=\"inline\">UpsertPlayerState</code>), который раз в тик просто листит все <code class=\"inline\">GameServer</code>&#x27;ы напрямую, а не полагается на watch-поток.</p><p>**Корень**: <code class=\"inline\">agones.Client.WatchPods</code> ([watch.go:64-91](internal/coordinator/agones/watch.go#L64-L91)) — это голый <code class=\"inline\">clientset.Pods(ns).Watch(ctx, ListOptions{...})</code>, без предварительного <code class=\"inline\">List()</code>. По семантике k8s это значит: watch стримит события только &quot;с текущего момента&quot; — под, который уже существовал **до** установления соединения (или появился в узком окне переподключения), никогда не породит событие <code class=\"inline\">Added</code>, и <code class=\"inline\">Watcher</code> его просто не увидит, пока тот не завершится (тогда сработает <code class=\"inline\">Delete</code> → <code class=\"inline\">recordStopped</code>, но фаза &quot;работает&quot; останется невидимой навсегда).</p><p>Fleet-инстансы почти всегда проскакивают эту дыру благодаря тому, что их несколько и создаются они когда watch уже давно и стабильно висит. Test Launch — это ровно один под за раз: если он стартует именно в окне переподключения (<code class=\"inline\">runForever</code> перезапускает <code class=\"inline\">Run</code> при любой ошибке с бэкоффом 5с — [wiring.go:351](cmd/coordinator/wiring.go#L351)), событие гарантированно пропадает. Отсюда и «то воспроизводится, то нет».</p><p>Это тот же класс проблемы, что уже отмечен как открытый риск (несогласованность БД↔кластер без reconciliation-цикла) — только на уровне Pod-watch, не Fleet. Правильный фикс — не патч, а structural: либо (a) вручную сделать List+Watch с ресинком при реконнекте (как делает client-go Informer/Reflector под капотом), либо (b) добавить лёгкий периодический reconciliation-проход (сверять живые поды с <code class=\"inline\">gameserver_instances</code>, дописывать пропущенные <code class=\"inline\">UpsertRunning</code> — тот же паттерн, что уже предлагался для Fleet↔БД).</p><p>Something конкретное сделать сейчас, или сначала зафиксировать в PROJECT_MAP.md как открытый риск и обсудить, какой из двух вариантов чинить?</p>",
+    "ts": "2026-07-13T20:40:11.098Z"
   }
 ]
