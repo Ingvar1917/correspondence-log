@@ -17663,5 +17663,41 @@
     "who": "claude",
     "html": "<p>Понял, на этом закрываем. Если позже понадобится — просто дай знать, и повторю форс-делит для проверки <code class=\"inline\">stopped</code> живьём.</p>",
     "ts": "2026-07-13T01:34:22.159Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>двай добавим флаг --error с тремя значениями crash crash-10 oom в fakegame, догадываешься зачем?</p>",
+    "ts": "2026-07-13T01:35:44.299Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Догадываюсь: чтобы живьём (не через фейковые <code class=\"inline\">corev1.Pod</code> в юнит-тестах, а через реальный <code class=\"inline\">fakegame</code> в настоящем кластере) прогнать все категории <code class=\"inline\">instances.Watcher</code> — <code class=\"inline\">crash</code>, <code class=\"inline\">oom_killed</code>, и заодно проверить путь <code class=\"inline\">stopped</code>/<code class=\"inline\">normal_exit</code> в зависимости от того, успевает ли контейнер уйти в <code class=\"inline\">crash-10</code> до или после <code class=\"inline\">Stop</code>. Делаю.</p>",
+    "ts": "2026-07-13T01:36:37.361Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку.</p>",
+    "ts": "2026-07-13T01:37:06.920Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Быстрая проверка поведения (без реального k8s — просто локальный запуск бинаря).</p>",
+    "ts": "2026-07-13T01:37:14.190Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все три ветки работают как задумано.</p>",
+    "ts": "2026-07-13T01:38:18.319Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Убрано. Готово: <code class=\"inline\">deploy/local/fakegame/main.go</code> теперь понимает <code class=\"inline\">--error=crash|crash-10|oom</code>, все три ветки + невалидное значение проверил живым запуском бинаря.</p><p>Чтобы использовать в реальном кластере — пересобрать архив (<code class=\"inline\">make fakegame-archive</code>) и указать <code class=\"inline\">launch_command</code> вида <code class=\"inline\">./server --error=oom</code> (или <code class=\"inline\">crash</code>/<code class=\"inline\">crash-10</code>) при загрузке билда через дашборд/API, либо просто перезалить билд с новым <code class=\"inline\">launch_command</code> для уже существующей игры.</p>",
+    "ts": "2026-07-13T01:39:01.302Z"
   }
 ]
