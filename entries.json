@@ -19229,5 +19229,11 @@
     "who": "claude",
     "html": "<p>Риск №15 полностью закрыт — обе части реализованы, протестированы (Go: <code class=\"inline\">go build</code>/<code class=\"inline\">go vet</code>/полный <code class=\"inline\">go test ./...</code> с testcontainers; фронт: vitest + tsc), карта обновлена.</p><p>**Что сделано:**<br>1. **Митигация** — <code class=\"inline\">instancesize.Spec.EphemeralStorageMb</code> (S/M/L/XL = 1/2/4/8 GiB, эвристика &quot;2×RAM&quot;, явно помечена как первая прикидка) прокинута в <code class=\"inline\">agones.FleetSpec</code> → <code class=\"inline\">Resources.Requests/Limits[ResourceEphemeralStorage]</code>, Guaranteed QoS как у RAM/CPU — одним изменением покрыты и Fleet, и Test Launch (общая <code class=\"inline\">buildGameServerSpec</code>).<br>2. **Детект** — новая категория <code class=\"inline\">CategoryEvicted</code> (миграция <code class=\"inline\">000049</code>), <code class=\"inline\">instances.Watcher</code> теперь проверяет <code class=\"inline\">pod.Status.Reason == &quot;Evicted&quot;</code> **до** и **независимо** от контейнерного статуса — доказано тестом, что это работает, даже когда контейнер выдаёт вводящий в заблуждение <code class=\"inline\">Terminated{Reason:&quot;Error&quot;}</code>. Прокинуто до Indie Dashboard (фильтр, бейдж, i18n).</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
     "ts": "2026-07-13T16:41:12.995Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>нужна ли метртика индюку или нам входящего и исходящего трафика для инстанса?</p>",
+    "ts": "2026-07-13T16:42:21.443Z"
   }
 ]
