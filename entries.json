@@ -17699,5 +17699,17 @@
     "who": "claude",
     "html": "<p>Убрано. Готово: <code class=\"inline\">deploy/local/fakegame/main.go</code> теперь понимает <code class=\"inline\">--error=crash|crash-10|oom</code>, все три ветки + невалидное значение проверил живым запуском бинаря.</p><p>Чтобы использовать в реальном кластере — пересобрать архив (<code class=\"inline\">make fakegame-archive</code>) и указать <code class=\"inline\">launch_command</code> вида <code class=\"inline\">./server --error=oom</code> (или <code class=\"inline\">crash</code>/<code class=\"inline\">crash-10</code>) при загрузке билда через дашборд/API, либо просто перезалить билд с новым <code class=\"inline\">launch_command</code> для уже существующей игры.</p>",
     "ts": "2026-07-13T01:39:01.302Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>все работает, даже stopped поймал, так как после краша все инстансы поднимаются заново</p>",
+    "ts": "2026-07-13T01:44:47.700Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Отлично — значит все три категории (<code class=\"inline\">crash</code>, <code class=\"inline\">oom_killed</code> через <code class=\"inline\">--error=oom</code>, и <code class=\"inline\">stopped</code> через гонку при рестарте после краша) подтверждены живьём на реальном кластере, а не только в юнит-тестах. Логично, что <code class=\"inline\">stopped</code> поймался именно так: Fleet после краша поднимает замену, и если <code class=\"inline\">Stop</code> прилетел в этот момент — свежий под успевает попасть под удаление раньше, чем контейнер вообще что-то сообщил.</p><p>На сегодня, похоже, весь пайплайн <code class=\"inline\">instances.Watcher</code> (categories + резолв <code class=\"inline\">game_id</code> без гонки) прогнан по всем веткам вживую. Если что-то ещё всплывёт — зови.</p>",
+    "ts": "2026-07-13T01:45:00.604Z"
   }
 ]
