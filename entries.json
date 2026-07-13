@@ -20015,5 +20015,29 @@
     "who": "claude",
     "html": "<p>Теперь <code class=\"inline\">coordinator-process.json</code>.</p>",
     "ts": "2026-07-13T19:03:20.129Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Grafana сейчас запущена — провижининг сам подхватит файлы в течение ~30с (<code class=\"inline\">updateIntervalSeconds: 30</code>), перезапуск не нужен.</p><p>Разбил панели на группы (collapsible rows), тем же паттерном, что уже был у &quot;By tariff&quot;:</p><p>**<code class=\"inline\">coordinator-gameservers.json</code>:** новая строка **&quot;Per-game / per-account&quot;** (Replicas, CPU, Memory, Pods measured) + существующая **&quot;By tariff — free vs paid&quot;**.</p><p>**<code class=\"inline\">coordinator-process.json</code>** (было плоским списком из 13 панелей) — 4 строки:<br>- **Process health** — Goroutines, RSS, CPU, GC pause, Open FDs<br>- **Background loops** — last run duration, errors, provisioning stuck jobs<br>- **Postgres pool** — connections, wait for connection<br>- **Dashboard/Admin API (HTTP)** — request rate, error rate, p99 duration</p><p>Оба JSON проверены на валидность.</p>",
+    "ts": "2026-07-13T19:04:12.982Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>выведи в графану метрики над которыми мы сегодня работали</p>",
+    "ts": "2026-07-13T19:04:29.097Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю панель terminations после &quot;Pods measured&quot; и сдвину строку &quot;By tariff&quot; ниже.</p>",
+    "ts": "2026-07-13T19:05:41.323Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавлю строку &quot;External APIs&quot; в <code class=\"inline\">coordinator-process.json</code>.</p>",
+    "ts": "2026-07-13T19:06:15.425Z"
   }
 ]
