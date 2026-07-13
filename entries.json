@@ -19421,5 +19421,35 @@
     "who": "ihar",
     "html": "<p>какой лимит у пода по диску?</p>",
     "ts": "2026-07-13T17:23:49.575Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это из закрытого сегодня риска №15 (disk noisy neighbor) — лимит <code class=\"inline\">ephemeral-storage</code> на контейнер игры, сетка S/M/L/XL (эвристика &quot;2×RAM&quot;, первая прикидка, не сверенная с реальным usage):</p><p>| Размер | RAM | Диск (ephemeral-storage) |<br>|---|---|---|<br>| S | 512Mi | **1024Mi (1Gi)** |<br>| M | 1024Mi | **2048Mi (2Gi)** |<br>| L | 2048Mi | **4096Mi (4Gi)** |<br>| XL | 4096Mi | **8192Mi (8Gi)** |</p><p>Requests == Limits (Guaranteed QoS, как у RAM/CPU) — <code class=\"inline\">internal/coordinator/instancesize/instancesize.go:38-43</code>, прокинуто в <code class=\"inline\">agones/fleet.go</code>&#x27;s <code class=\"inline\">buildGameServerSpec</code>. Превышение лимита конкретным подом — kubelet вытесняет именно его (<code class=\"inline\">Evicted</code>, категория <code class=\"inline\">instances.CategoryEvicted</code>), не ждёт, пока нода в целом уйдёт в <code class=\"inline\">DiskPressure</code>.</p>",
+    "ts": "2026-07-13T17:24:01.348Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>добавь ошибку storage в fakegame</p>",
+    "ts": "2026-07-13T17:24:25.346Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавлю саму функцию <code class=\"inline\">storageLoop</code> рядом с <code class=\"inline\">oomLoop</code>.</p>",
+    "ts": "2026-07-13T17:25:12.591Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку и gofmt.</p>",
+    "ts": "2026-07-13T17:25:34.710Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собирается чисто, без замечаний gofmt/vet.</p>",
+    "ts": "2026-07-13T17:25:43.005Z"
   }
 ]
