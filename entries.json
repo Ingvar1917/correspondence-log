@@ -18695,5 +18695,17 @@
     "who": "claude",
     "html": "<p>Нашёл нужное место — строка 69, пункт про &quot;количество нод кластера&quot;. Добавлю туда disk-pressure/disk-usage как соседний открытый пункт.</p>",
     "ts": "2026-07-13T15:36:13.459Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Зафиксировано в <code class=\"inline\">PROJECT_MAP.md</code> (строка 70, рядом с node-count) — disk pressure/занятость диска ноды как открытый пункт node-level observability, с объяснением механизма kubelet image GC и почему нужен отдельный компонент (<code class=\"inline\">kube-state-metrics</code> или <code class=\"inline\">node-exporter</code>), а не расширение текущего <code class=\"inline\">Collector</code>.</p>",
+    "ts": "2026-07-13T15:36:33.121Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>давай поговорим про метрики самого координатора, что нам важно видеть и почему?</p>",
+    "ts": "2026-07-13T15:37:53.014Z"
   }
 ]
