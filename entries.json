@@ -17261,5 +17261,17 @@
     "who": "claude",
     "html": "<p>Дашборд обновлён (панель «By tariff — free vs paid», <code class=\"inline\">tariff_id</code> добавлен в легенды). Перезапускаю Grafana, чтобы подхватить JSON, и проверяю его валидность — саму сборку coordinator&#x27;а перезапускать не стал, это уже трогает твой текущий dev-процесс.</p>",
     "ts": "2026-07-13T00:39:34.435Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Дашборд загрузился, все 9 панелей на месте.</p><p>**Готово по коду:**<br>- <code class=\"inline\">games.Repository.ListTariffsByGameID</code> — новый метод, полный <code class=\"inline\">SELECT id, tariff_id FROM games</code> (тест <code class=\"inline\">TestListTariffsByGameID_ReturnsEveryGamesTariff</code> зелёный).<br>- <code class=\"inline\">metrics.GameTariffs</code> — интерфейс в <code class=\"inline\">Collector</code>, дергается раз в тик, best-effort.<br>- <code class=\"inline\">Exporter</code> — третий лейбл <code class=\"inline\">tariff_id</code> на всех 7 гейджах; <code class=\"inline\">Forget</code> теперь через <code class=\"inline\">DeletePartialMatch</code> (не знает тариф на момент забывания игры — и не должен).<br>- <code class=\"inline\">wiring.go</code> — прокинут <code class=\"inline\">gamesRepo</code> в <code class=\"inline\">metrics.New</code>.<br>- Полный <code class=\"inline\">go test ./...</code> зелёный.<br>- Дашборд: <code class=\"inline\">tariff_id</code> в легендах существующих панелей + отдельный ряд «By tariff — free vs paid» (agregирует по всей платформе, не завязан на фильтры Account/Game).</p><p>**Не сделано без подтверждения:** сам <code class=\"inline\">tariff_id</code> появится в <code class=\"inline\">/metrics</code> только после пересборки и перезапуска твоего dev-stack бинаря — текущий запущенный процесс собран до этого изменения. Пересобрать и перезапустить <code class=\"inline\">make dev-stack</code> сейчас?</p>",
+    "ts": "2026-07-13T00:39:50.952Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>а почему собственно я решил вынести monitoring из проекта, пусть лежит в проекте, так?</p>",
+    "ts": "2026-07-13T00:40:48.188Z"
   }
 ]
