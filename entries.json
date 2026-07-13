@@ -19451,5 +19451,35 @@
     "who": "claude",
     "html": "<p>Собирается чисто, без замечаний gofmt/vet.</p>",
     "ts": "2026-07-13T17:25:43.005Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. <code class=\"inline\">--error=storage</code> добавлен по образцу <code class=\"inline\">--error=oom</code>: копит файл на диске (в <code class=\"inline\">os.TempDir()</code>, той же файловой системе, что kubelet мерит под ephemeral-storage), с <code class=\"inline\">fsync</code> на каждую запись — чтобы byte реально ложились на диск, а не висели в page cache. Позволит живьём проверить сегодняшний фикс: под должен получить настоящий <code class=\"inline\">Evicted</code> от kubelet, а <code class=\"inline\">instances.Watcher</code> — записать это как <code class=\"inline\">CategoryEvicted</code>, не как обычный <code class=\"inline\">crash</code>.</p>",
+    "ts": "2026-07-13T17:25:49.337Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сделай что бы ошибка oom происходила в течении 10ти секунд, и что бы цифры RAM росли 2^1 -1 2^2-1 2^3-1 .....</p>",
+    "ts": "2026-07-13T17:28:04.226Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сама функция <code class=\"inline\">oomLoop</code>.</p>",
+    "ts": "2026-07-13T17:29:10.675Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку.</p>",
+    "ts": "2026-07-13T17:29:18.568Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Быстрая проверка вживую (с таймаутом, чтобы не съесть реальную память машины):</p>",
+    "ts": "2026-07-13T17:29:24.448Z"
   }
 ]
