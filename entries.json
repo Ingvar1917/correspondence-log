@@ -22121,5 +22121,47 @@
     "who": "claude",
     "html": "<p>Clean. Everything checks out.</p>",
     "ts": "2026-07-13T19:40:43.364Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Реализовано по плану:</p><p>- **<code class=\"inline\">agones.Client.UpdateFleetTemplate</code>** ([fleet.go](internal/coordinator/agones/fleet.go)) — Get→заменить <code class=\"inline\">Spec.Template</code>→Update, реплики не трогает, паттерн один в один с <code class=\"inline\">ScaleFleet</code>.<br>- **<code class=\"inline\">Launcher.RolloutActiveBuild</code>** ([launcher.go](internal/coordinator/launcher/launcher.go)) — для каждого уже запущенного региона (<code class=\"inline\">ClusterID != nil</code>) пересобирает <code class=\"inline\">FleetSpec</code> из текущего активного билда/образа и пушит его через новый метод; не запущенные регионы — <code class=\"inline\">RegionOutcomeNotLaunched</code>, не ошибка. Общая сборка <code class=\"inline\">FleetSpec</code> вынесена в <code class=\"inline\">fleetSpecFor</code>, переиспользуется и <code class=\"inline\">launchRegion</code>.<br>- **<code class=\"inline\">handleActivateBuild</code>** зовёт <code class=\"inline\">RolloutActiveBuild</code> сразу после <code class=\"inline\">SetActiveBuild</code>, ответ несёт <code class=\"inline\">rollout: [...]</code> с исходом по каждому региону.<br>- UI-подсказка про &quot;applies on restart&quot; исправлена на актуальную.<br>- <code class=\"inline\">PROJECT_MAP.md</code> риск №8 помечен решённым, с описанием механизма и явной оговоркой, что version-pinned matchmaking (доп. 2026-07-11) — отдельная, ещё не закрытая работа.</p><p>Все тесты зелёные: <code class=\"inline\">go test ./...</code> (весь бэкенд, включая новые в <code class=\"inline\">agones</code>/<code class=\"inline\">launcher</code>/<code class=\"inline\">dashboardapi</code>), <code class=\"inline\">npm run test</code> (106/106 фронт), <code class=\"inline\">tsc --noEmit</code> чисто.</p><p>Осталось по плану, но живьём не проверено (нужен реальный кластер, не фейковый клиент) — сценарий в <code class=\"inline\">test-e2e-launcher</code>: Launch → RolloutActiveBuild с новой командой → Ready-под получает новую команду, Allocated — нет, до освобождения. Это стоит прогнать перед тем, как полагаться на это в проде; хотите, чтобы я сейчас добавил такой сценарий в <code class=\"inline\">test-e2e-launcher</code> и прогнал его?</p>",
+    "ts": "2026-07-13T19:40:58.918Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>да</p>",
+    "ts": "2026-07-13T19:41:13.585Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Good, confirmed. Now let me check GameServer allocation state field names / whether GameServer object has a <code class=\"inline\">Ready</code> state list I can query easily via kubectl.</p>",
+    "ts": "2026-07-13T19:42:51.126Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Expected — I&#x27;ll append the new test now which uses both.</p>",
+    "ts": "2026-07-13T19:43:37.432Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s build with the e2e tag to check for compile errors before actually running against the live cluster.</p>",
+    "ts": "2026-07-13T19:44:13.229Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Compiles clean. Now let&#x27;s check whether the e2e cluster/tooling is available before attempting a live run.</p>",
+    "ts": "2026-07-13T19:44:20.646Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Cluster tooling is present but the <code class=\"inline\">agones-e2e</code> cluster isn&#x27;t up yet. Running <code class=\"inline\">make test-e2e-launcher</code>, which will provision it if needed — this can take a few minutes.</p>",
+    "ts": "2026-07-13T19:44:26.790Z"
   }
 ]
