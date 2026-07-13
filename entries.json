@@ -17309,5 +17309,29 @@
     "who": "claude",
     "html": "<p>Работает с нового места. Проверю Grafana-датасорсы/дашборд после переезда и статус git в coordinator.</p>",
     "ts": "2026-07-13T00:44:08.799Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё на месте: датасорсы живы, <code class=\"inline\">monitoring/</code> теперь виден в <code class=\"inline\">git status</code> coordinator&#x27;а как новая (пока не добавленная) директория.</p><p>**Готово:**<br>- <code class=\"inline\">ludarium/monitoring/</code> → <code class=\"inline\">coordinator/monitoring/</code> (<code class=\"inline\">docker compose down</code> перед переносом, чтобы не оставить осиротевшие контейнеры).<br>- <code class=\"inline\">monitoring/Makefile</code> удалён, его 6 целей перенесены в главный <code class=\"inline\">Makefile</code> с префиксом <code class=\"inline\">monitoring-*</code> (<code class=\"inline\">monitoring-up/down/restart/logs/status/wipe</code>), команды выполняются через <code class=\"inline\">cd monitoring &amp;&amp; docker compose ...</code> — тот же паттерн, что уже используется для <code class=\"inline\">dashboardui</code>/<code class=\"inline\">admindashboardui</code>.<br>- Проверил живьём: <code class=\"inline\">make monitoring-up</code> и <code class=\"inline\">make monitoring-status</code> реально работают с новым путём, датасорсы Grafana целы.</p><p>Не коммитил — <code class=\"inline\">git status</code> показывает <code class=\"inline\">monitoring/</code> как untracked плюс изменённые Makefile/PROJECT_MAP.md/Go-файлы из этой сессии. Коммитить?</p>",
+    "ts": "2026-07-13T00:44:18.981Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>почему аккаунт paid выясни плиз</p>",
+    "ts": "2026-07-13T00:45:09.401Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл причину — это не про сам аккаунт, это устаревший бинарь <code class=\"inline\">coordinator</code>.</p>",
+    "ts": "2026-07-13T00:45:33.065Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Причина: игра <code class=\"inline\">111</code> в базе действительно на тарифе <code class=\"inline\">free</code> — база тут ни при чём. Проблема в том, что запущенный <code class=\"inline\">dev-stack</code> (<code class=\"inline\">bin/coordinator</code>, PID стартовал в 02:14:18) собран **до** того, как мы в этой сессии добавили лейбл <code class=\"inline\">tariff_id</code> в <code class=\"inline\">Exporter</code>. В <code class=\"inline\">/metrics</code> у этого процесса до сих пор только <code class=\"inline\">cluster_id</code>+<code class=\"inline\">game_id</code>, без <code class=\"inline\">tariff_id</code> вообще — я это только что проверил напрямую.</p><p>Из-за этого Prometheus трактует отсутствующий лейбл как пустую строку <code class=\"inline\">&quot;&quot;</code>, а панель фильтрует <code class=\"inline\">tariff_id!=&quot;free&quot;</code> (т.е. «всё, что не равно <code class=\"inline\">free</code>») — пустая строка <code class=\"inline\">&quot;&quot;</code> под это условие подходит, вот игра и утекает в кривую «paid», хотя <code class=\"inline\">tariff_id=&quot;free&quot;</code> не матчит ничего (оттого кривая free и пустая на графике).</p><p>Это не баг дашборда/аккаунта — просто нужно пересобрать и перезапустить <code class=\"inline\">bin/coordinator</code> (<code class=\"inline\">make dev-stack</code>), чтобы новый код реально начал писать <code class=\"inline\">tariff_id</code> в метрики. Пересобрать и перезапустить сейчас?</p>",
+    "ts": "2026-07-13T00:45:50.717Z"
   }
 ]
