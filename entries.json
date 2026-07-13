@@ -26891,5 +26891,95 @@
     "who": "claude",
     "html": "<p>Всё чисто, файлы на месте. Фича полностью готова и проверена живьём.</p><p>## Итог</p><p>Реализован pull-through registry cache per-кластер (план <code class=\"inline\">concurrent-gathering-prism.md</code>):</p><p>- **<code class=\"inline\">internal/coordinator/registrycache</code>** — новый пакет: <code class=\"inline\">Repository</code> (одна строка на кластер в <code class=\"inline\">cluster_cache</code>, миграция <code class=\"inline\">000054</code>) + <code class=\"inline\">Installer</code> (чистый client-go, без helm: <code class=\"inline\">Deployment</code>/<code class=\"inline\">Service</code>/<code class=\"inline\">DaemonSet</code>, DaemonSet пишет <code class=\"inline\">hosts.toml</code> на нодах).<br>- **<code class=\"inline\">admindashboard</code>**: <code class=\"inline\">POST/GET/PATCH/DELETE /clusters/{id}/cache</code> — деплой/статус/ресайз/снос, синхронно (не async-job).<br>- Тесты: fake-clientset для <code class=\"inline\">registrycache</code>, fake-installer для <code class=\"inline\">admindashboard</code>, полный <code class=\"inline\">go test ./...</code> зелёный.<br>- **Живой прогон на реальных <code class=\"inline\">coordinator-dev</code>+<code class=\"inline\">coordinator-eu</code>**: после деплоя кэша тенантский образ игры в <code class=\"inline\">eu</code> спуллился за ~1с (было — вечный <code class=\"inline\">ImagePullBackOff</code>).<br>- Живьём же поймал баг, который не поймал ни один fake-тест: containerd живёт в netns **ноды**, а не пода, поэтому DNS-имя даже своего локального Service не резолвит — <code class=\"inline\">hosts.toml</code> должен указывать на ClusterIP. Исправлено в коде и в тесте.<br>- <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">WHATIF.md</code> обновлены.</p><p>**Отдельно найден, но не закрыт** новый пробел: <code class=\"inline\">bridge-sidecar:dev</code> — это не тенантский образ, а голый <code class=\"inline\">kind load</code>-тег без адреса registry вовсе, кэш ему ничем не помогает. Из-за этого под в <code class=\"inline\">eu</code> всё ещё не доходит до полного <code class=\"inline\">Ready</code> (2/3 контейнеров). Чинить сейчас (запушить <code class=\"inline\">bridge-sidecar</code>/<code class=\"inline\">build-unpacker</code> в тот же центральный registry и поменять <code class=\"inline\">BRIDGE_SIDECAR_IMAGE</code>) — или оставить как отдельную задачу на потом?</p>",
     "ts": "2026-07-13T23:08:15.956Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>чинить сейчас</p>",
+    "ts": "2026-07-13T23:08:51.261Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">dev-stack.sh</code>:</p>",
+    "ts": "2026-07-13T23:11:28.775Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">setup-dev-extras.sh</code> — пушим bridge-sidecar в registry вместо (или вместе с) <code class=\"inline\">kind load</code>:</p>",
+    "ts": "2026-07-13T23:11:40.350Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо. Теперь применяю фикс живьём: билд + пуш образа, live-патч зависшего пода, затем перекат in-cluster деплоя на новый env.</p>",
+    "ts": "2026-07-13T23:12:12.707Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Образ собран и запушен в registry. Проверяю живой стек — патчу текущий зависший под на <code class=\"inline\">eu</code>, чтобы сразу проверить путь без полного релонча.</p>",
+    "ts": "2026-07-13T23:12:30.527Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Патч прошёл. Слежу за статусом.</p>",
+    "ts": "2026-07-13T23:12:43.941Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>GameServer стал <code class=\"inline\">Ready</code> — механизм подтверждён. Но это разовый патч конкретного пода; сам Fleet-темплейт в Agones всё ещё хранит старый образ. Накатываю постоянный фикс — обновляю <code class=\"inline\">deployment/app</code> в dev-кластере и делаю настоящий relaunch, чтобы Fleet-спека тоже обновилась.</p>",
+    "ts": "2026-07-13T23:13:01.349Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Образ собран. Загружаю в кластер и прогоняю миграции + деплой.</p>",
+    "ts": "2026-07-13T23:15:42.483Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Миграции применены свежим образом. Теперь применяю app-манифест и слежу за rollout.</p>",
+    "ts": "2026-07-13T23:16:03.213Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Приложение снова живо, с новым образом и env. Проверяю логи на чистоту.</p>",
+    "ts": "2026-07-13T23:16:12.020Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверка также вскрыла отдельную, не связанную с текущей задачей проблему: у зарегистрированного kubeconfig кластера <code class=\"inline\">eu</code> — адрес <code class=\"inline\">127.0.0.1:PORT</code> (годится только с хоста, не из пода координатора внутри <code class=\"inline\">dev</code>-кластера), поэтому фоновые watch-циклы для <code class=\"inline\">eu</code> не работают. Это не мешает завершить фикс bridge-sidecar — обновлю сам Fleet-темплейт напрямую через kubectl, не дожидаясь живого coordinator&#x27;а.</p>",
+    "ts": "2026-07-13T23:17:01.479Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>bridge-sidecar — индекс 1. Патчу Fleet напрямую.</p>",
+    "ts": "2026-07-13T23:17:17.860Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Fleet сам пересоздал GameServer с новым темплейтом — сразу <code class=\"inline\">Ready</code>, 3/3 контейнера. Проверяю образ на новом поде для полной уверенности.</p>",
+    "ts": "2026-07-13T23:17:50.121Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба образа теперь идут через центральный registry + pull-through cache, GameServer в <code class=\"inline\">eu</code> — <code class=\"inline\">Ready</code> без единого ручного патча пода. Финальный прогон тестов после всех правок.</p>",
+    "ts": "2026-07-13T23:18:04.558Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё на месте, ничего лишнего не осталось (временный <code class=\"inline\">cmd/cachedebug</code> удалён, port-forward остановлен).</p><p>## Итог</p><p>Bridge-sidecar теперь распространяется через ту же инфраструктуру, что и тенантские образы:</p><p>- <code class=\"inline\">bridge-sidecar:dev</code> пушится в центральный registry (<code class=\"inline\">registry.coordinator.svc.cluster.local:5000/bridge-sidecar:dev</code>) вместо голого <code class=\"inline\">kind load</code>-тега — правки в <code class=\"inline\">setup-dev-extras.sh</code>, <code class=\"inline\">deploy/local/app.yaml</code>, <code class=\"inline\">deploy/local/dev-stack.sh</code>. Новой инфраструктуры не потребовалось — просто едет через уже готовый pull-through cache.<br>- Живьём: собрал и запушил образ, точечно пропатчил зависший под (подтвердил, что путь пуллится), пересобрал и передеплоил сам coordinator (заодно синхронизировал живую БД с миграциями 000053/000054), допатчил Fleet-темплейт игры в <code class=\"inline\">eu</code> напрямую — Agones пересоздал GameServer: **<code class=\"inline\">3/3 Running</code>, <code class=\"inline\">STATE=Ready</code>**, без единого ручного патча пода.<br>- Полный <code class=\"inline\">go build</code>/<code class=\"inline\">go vet</code>/<code class=\"inline\">go test ./...</code> — зелёный.<br>- <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">WHATIF.md</code> обновлены.</p><p>Заодно всплыл отдельный, не связанный баг: kubeconfig кластера <code class=\"inline\">eu</code> в <code class=\"inline\">cluster_registry</code> хранит адрес <code class=\"inline\">127.0.0.1:&lt;порт&gt;</code> — работает при обращении с хоста, но не из пода самого coordinator&#x27;а (другой network namespace), поэтому его фоновые watch-циклы для <code class=\"inline\">eu</code> не поднимаются. Не чинил — задокументировал в WHATIF.md как отдельную задачу, не относящуюся к registry-cache/bridge-sidecar.</p><p>Коммит-сообщение для этого блока:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-13T23:20:10.422Z"
   }
 ]
