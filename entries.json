@@ -18677,5 +18677,23 @@
     "who": "ihar",
     "html": "<p>нет, нужна ли эта инфа в метриках?</p>",
     "ts": "2026-07-13T15:33:14.554Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Да, но отдельным путём от того, что у нас есть сейчас — стоит понимать, почему.</p><p>**Что мы собираем сейчас:** CPU/RAM подов через metrics-server, player count через лейблы Agones. Ни то, ни другое не видит диск ноды вообще — metrics-server агрегирует только CPU/Memory, у него нет disk-метрик.</p><p>**Что нужно для этого сигнала:** либо <code class=\"inline\">kube-state-metrics</code> (даёт <code class=\"inline\">kube_node_status_condition{condition=&quot;DiskPressure&quot;}</code> — готовый бинарный сигнал «нода уже в беде»), либо <code class=\"inline\">node-exporter</code> (даёт реальный % занятого диска — сигнал раньше, до того как kubelet скажет DiskPressure). Ни того, ни другого сейчас в стеке нет (только <code class=\"inline\">metrics-server</code>, см. <code class=\"inline\">setup-dev-extras.sh</code>).</p><p>**Насколько это реальный риск для нас конкретно:** обычно disk-pressure от образов — редкость, потому что автоскейлер cloud-провайдера добавляет ноду раньше, чем диск забьётся (CPU/RAM обычно упираются первыми). Но у нас нетипичный случай — множество **разных игровых образов** гоняются через одни и те же ноды (не одно приложение с парой версий), так что рост кэша образов при разнообразии игр — не гипотетический сценарий, а особенность именно multiplayer BaaS с произвольными играми.</p><p>**Вывод:** метрика оправдана, но это не &quot;добавить метрику в существующий Collector&quot;, а отдельный, более дешёвый путь — задеплоить <code class=\"inline\">kube-state-metrics</code> (read-only, cheap, community Helm chart) и снять готовый <code class=\"inline\">DiskPressure</code> condition, либо <code class=\"inline\">node-exporter</code> для % диска заранее. По объёму это соразмерно уже отмеченному в карте открытому пункту &quot;node-count metric&quot; — логично объединить в одну задачу &quot;node-level observability&quot;, а не делать прямо сейчас.</p><p>Зафиксировать это как открытый пункт в <code class=\"inline\">PROJECT_MAP.md</code> рядом с node-count metric, или пока не надо?</p>",
+    "ts": "2026-07-13T15:33:53.275Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>зафиксируй</p>",
+    "ts": "2026-07-13T15:35:57.195Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл нужное место — строка 69, пункт про &quot;количество нод кластера&quot;. Добавлю туда disk-pressure/disk-usage как соседний открытый пункт.</p>",
+    "ts": "2026-07-13T15:36:13.459Z"
   }
 ]
