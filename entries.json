@@ -17711,5 +17711,11 @@
     "who": "claude",
     "html": "<p>Отлично — значит все три категории (<code class=\"inline\">crash</code>, <code class=\"inline\">oom_killed</code> через <code class=\"inline\">--error=oom</code>, и <code class=\"inline\">stopped</code> через гонку при рестарте после краша) подтверждены живьём на реальном кластере, а не только в юнит-тестах. Логично, что <code class=\"inline\">stopped</code> поймался именно так: Fleet после краша поднимает замену, и если <code class=\"inline\">Stop</code> прилетел в этот момент — свежий под успевает попасть под удаление раньше, чем контейнер вообще что-то сообщил.</p><p>На сегодня, похоже, весь пайплайн <code class=\"inline\">instances.Watcher</code> (categories + резолв <code class=\"inline\">game_id</code> без гонки) прогнан по всем веткам вживую. Если что-то ещё всплывёт — зови.</p>",
     "ts": "2026-07-13T01:45:00.604Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>а ты куда-то уходишь?</p>",
+    "ts": "2026-07-13T01:45:30.675Z"
   }
 ]
