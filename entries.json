@@ -23021,5 +23021,65 @@
     "who": "claude",
     "html": "<p>Не с тестовым инстансом — это вообще **другой кластер**.</p><p>Проверил напрямую (расшифровал сохранённые kubeconfig&#x27;и через <code class=\"inline\">clusterregistry.Repository</code>): в <code class=\"inline\">cluster_registry</code> зарегистрировано **два** живых кластера, каждый крутит свой собственный <code class=\"inline\">metrics.Collector</code> (тикает раз в 30с независимо):</p><p>1. <code class=\"inline\">coordinator-dev</code> (регион <code class=\"inline\">dev</code>) — тот, где живёт ваша игра и тестовый инстанс. Metrics-server там работает нормально, я это уже проверил.<br>2. <code class=\"inline\">coordinator-eu</code> (регион <code class=\"inline\">eu</code>) — отдельный kind-кластер, судя по всему поднятый через админский provisioning-флоу (<code class=\"inline\">provisioning.KindAdapter</code>, тот же, что для DO/Vultr/OVH) для тестирования этой фичи. Проверил: Agones там стоит и работает, а **metrics-server — нет вообще**, ни пода, ни <code class=\"inline\">APIService</code>. Именно этот кластер и спамит каждые 30с — его collector честно повторяет: «сходил за метриками, add-on&#x27;а нет».</p><p>Это ровно та же, уже описанная в коде, штатная деградация («metrics-server — опциональный add-on»), просто она относится не к вашей игре, а к второму, отдельно поднятому тестовому кластеру. Ваш тестовый инстанс тут вообще не участвует.</p><p>Что делать — на выбор:<br>1. Поставить metrics-server и на <code class=\"inline\">coordinator-eu</code> тоже (тем же способом, что <code class=\"inline\">setup-dev-extras.sh</code> ставит на <code class=\"inline\">dev</code>) — тихо, но лишний шаг ради кластера, который, возможно, был нужен только для проверки provisioning-флоу.<br>2. Если <code class=\"inline\">coordinator-eu</code> уже не нужен — снести (<code class=\"inline\">kind delete cluster --name coordinator-eu</code> + убрать строку из <code class=\"inline\">cluster_registry</code>) — тогда и лог пропадёт сам.<br>3. Оставить как есть — это не ошибка, просто шум от второго кластера без опционального add-on&#x27;а.</p><p>Какой вариант?</p>",
     "ts": "2026-07-13T21:58:54.165Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>ну да. на каждом кластере должно быть все штатно</p>",
+    "ts": "2026-07-13T22:00:08.901Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Design (brief): I&#x27;ll extend <code class=\"inline\">HelmInstaller</code> (already used for Agones) with a new <code class=\"inline\">InstallMetricsServer</code> method on the same <code class=\"inline\">AgonesInstaller</code> interface — checked idempotently via the <code class=\"inline\">metrics.k8s.io</code> APIService (not a helm-release check, since a real cloud might ship it through its own mechanism), called from <code class=\"inline\">Manager.finish()</code> right after Agones, hard-failing the job if it errors (matches &quot;everything necessary&quot; — same treatment as Agones itself). <code class=\"inline\">--kubelet-insecure-tls</code> only for <code class=\"inline\">cloud==&quot;kind&quot;</code>, since that&#x27;s kind&#x27;s own known cert quirk, not something to force on real clouds unverified. Implementing now.</p>",
+    "ts": "2026-07-13T22:03:21.639Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s update <code class=\"inline\">helm.go</code> to add <code class=\"inline\">InstallMetricsServer</code>, extending the <code class=\"inline\">AgonesInstaller</code> interface.</p>",
+    "ts": "2026-07-13T22:03:29.318Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now wiring it into <code class=\"inline\">Manager.finish()</code>:</p>",
+    "ts": "2026-07-13T22:04:04.853Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s update the <code class=\"inline\">fakeAgones</code> test fake to satisfy the extended interface.</p>",
+    "ts": "2026-07-13T22:04:16.319Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Compiles clean, no test call sites needed updating (confirmed my interface-extension approach worked as intended). Let&#x27;s run the provisioning package tests.</p>",
+    "ts": "2026-07-13T22:04:39.872Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s add a dedicated test proving the wiring: <code class=\"inline\">finish()</code> calls <code class=\"inline\">InstallMetricsServer</code> with the right <code class=\"inline\">insecureTLS</code> flag per cloud, and that a failure there fails the job.</p>",
+    "ts": "2026-07-13T22:04:53.016Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All pass. Now the full package and full suite.</p>",
+    "ts": "2026-07-13T22:05:41.211Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Теперь закрою прямо сейчас <code class=\"inline\">coordinator-eu</code> вручную, раз он уже существует и был провизионирован до фикса.</p>",
+    "ts": "2026-07-13T22:06:11.567Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">coordinator-eu</code> уже не существует — исчез между вашим предыдущим сообщением и сейчас (<code class=\"inline\">kind get clusters</code> его больше не показывает, соответствующего docker-контейнера нет). Не моих рук дело — похоже, само собой снесено (TTL / админский deprovision-флоу). Ручной one-off патч на него, соответственно, не нужен — патчить нечего.</p><p>Код-фикс сделан и протестирован:<br>- <code class=\"inline\">AgonesInstaller</code> (интерфейс, <code class=\"inline\">HelmInstaller</code>) теперь ставит metrics-server сразу после Agones на **каждом** новом кластере через admin-provisioning-флоу, для любого облака — с проверкой «уже есть metrics.k8s.io API → пропустить» (на случай, если облако уже несёт свой).<br>- <code class=\"inline\">--kubelet-insecure-tls</code> — только для <code class=\"inline\">cloud==&quot;kind&quot;</code>, реальным облакам эта строгость TLS не ослабляется без явной проверки.<br>- Ошибка установки теперь роняет весь provisioning-job (как и с Agones) — «всё необходимое» либо есть, либо кластер не считается готовым.</p><p>Тесты (включая падение job&#x27;а при сбое установки, и точную проверку insecureTLS true/false по облаку) — все проходят, полный <code class=\"inline\">go test ./...</code> зелёный.</p><p>Останется стейл-строка в <code class=\"inline\">cluster_registry</code> для уже удалённого <code class=\"inline\">coordinator-eu</code> — отдельный, не срочный хвост (та же природа, что и находка про старую инкарнацию кластера раньше сегодня); чистить сейчас?</p>",
+    "ts": "2026-07-13T22:06:46.241Z"
   }
 ]
