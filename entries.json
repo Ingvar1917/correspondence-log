@@ -17381,5 +17381,113 @@
     "who": "claude",
     "html": "<p>Нашёл причину — реальный баг в <code class=\"inline\">instances.Watcher</code>, не в дашборде.</p>",
     "ts": "2026-07-13T00:57:39.058Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Что проверил:**<br>- В базе (<code class=\"inline\">gameserver_instances</code>) 10 строк для твоей игры (<code class=\"inline\">111</code>, <code class=\"inline\">fce98936…</code>) до сих пор висят с <code class=\"inline\">ended_at = NULL</code>, <code class=\"inline\">category = NULL</code>, <code class=\"inline\">last_seen_at</code> замер на <code class=\"inline\">00:03:27</code> — с момента остановки прошло больше 2.5 часов.<br>- В кластере реально пусто: <code class=\"inline\">kubectl get fleets/gameservers/pods</code> — <code class=\"inline\">No resources found</code>. Игра правда остановлена, Fleet удалён.<br>- Т.е. Indie Dashboard честно показывает то, что в БД — проблема на уровень ниже, в <code class=\"inline\">instances.Watcher</code>, который эту БД пишет.</p><p>**Корень бага** — <code class=\"inline\">internal/coordinator/instances/watcher.go:114-122</code>:</p><pre><code>func (w *Watcher) handle(ctx context.Context, event agones.PodEvent) {\n\tpod := event.Pod\n\n\tif event.Type == watch.Deleted {\n\t\tw.mu.Lock()\n\t\tdelete(w.recorded, pod.Name)\n\t\tw.mu.Unlock()\n\t\treturn   // ← вот тут: просто выходит, ничего не пишет в Store\n\t}\n\t...\n</code></pre><p>Пока под сам живёт и его контейнер естественно завершается (краш/OOM/exit) — приходит <code class=\"inline\">Update</code>-событие с <code class=\"inline\">ContainerStatuses[...].State.Terminated</code>, и <code class=\"inline\">UpsertTermination</code> вызывается нормально. Но при <code class=\"inline\">Stop</code> игры удаляется весь Fleet → Kubernetes каскадно удаляет GameServer&#x27;ы/поды **напрямую**, часто пока контейнер ещё реально <code class=\"inline\">Running</code> — то есть <code class=\"inline\">Terminated</code>-статус на поде так никогда и не появляется, приходит сразу <code class=\"inline\">Deleted</code>-событие. А в этой ветке <code class=\"inline\">handle</code> просто чистит свой internal dedup-мапу (<code class=\"inline\">recorded</code>) и возвращается — **<code class=\"inline\">UpsertTermination</code> не вызывается вообще**. Строка в БД так и остаётся выглядеть «ещё работает» навсегда.</p><p>Это тот же класс проблемы, что мы чинили сегодня в Prometheus-экспортере, только тут исправление обратное — не удалить строку, а **дозаписать** факт остановки, которого никогда не было.</p><p>Развилка, куда я пока не лез:<br>1. **Проще всего** — на <code class=\"inline\">Deleted</code> без ранее увиденного <code class=\"inline\">Terminated</code>-статуса писать <code class=\"inline\">category=&quot;normal_exit&quot;</code> (существующее значение, без миграции), reason условно <code class=\"inline\">&quot;deleted&quot;</code>.<br>2. **Точнее** — завести новый <code class=\"inline\">category</code> (например <code class=\"inline\">stopped</code>), отличающий «мы сами остановили игру» от «контейнер упал сам» — требует миграции (расширить CHECK на <code class=\"inline\">gameserver_instances.category</code>), зато честнее для будущего анализа инцидентов.<br>3. **Компромисс** — просто проставить <code class=\"inline\">ended_at</code>, а <code class=\"inline\">category</code> оставить <code class=\"inline\">NULL</code> (колонка и так nullable) — «знаем, что закончилось, но не знаем как» — без миграции, ничего не выдумываем.</p><p>Какой вариант брать?</p>",
+    "ts": "2026-07-13T00:57:55.887Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>второй вариант, пока работаем точнее, компромиссы и как проще будем делать когда будут клиенты</p>",
+    "ts": "2026-07-13T00:59:56.459Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Пишу миграцию 000047.</p>",
+    "ts": "2026-07-13T01:01:50.288Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">instance.go</code> — новая категория.</p>",
+    "ts": "2026-07-13T01:02:05.542Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь основной фикс — <code class=\"inline\">watcher.go</code>, ветка <code class=\"inline\">Deleted</code>.</p>",
+    "ts": "2026-07-13T01:02:25.616Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — метод <code class=\"inline\">recordStopped</code> ещё не добавлен. Добавляю его сейчас.</p>",
+    "ts": "2026-07-13T01:03:12.151Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилирую и проверяю.</p>",
+    "ts": "2026-07-13T01:03:31.464Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">dashboardapi/handlers.go</code> — добавить <code class=\"inline\">stopped</code> в валидный список категорий.</p>",
+    "ts": "2026-07-13T01:03:38.628Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь тест на новую ветку <code class=\"inline\">watcher.go</code>.</p>",
+    "ts": "2026-07-13T01:04:07.450Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогоняю тесты пакета <code class=\"inline\">instances</code>.</p>",
+    "ts": "2026-07-13T01:04:31.115Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все зелёные, включая новые. Проверю миграцию отдельно (<code class=\"inline\">db/migrate_test.go</code> гоняет полный up/down цикл).</p>",
+    "ts": "2026-07-13T01:04:50.535Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Миграция вверх/вниз чистая. Теперь фронтенд — добавлю категорию <code class=\"inline\">stopped</code> в <code class=\"inline\">MonitoringTab.tsx</code>, i18n и badge/фильтр.</p>",
+    "ts": "2026-07-13T01:05:12.032Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, <code class=\"inline\">info</code> есть. Теперь проверю тесты фронта, чтобы убедиться, что ничего не сломалось, и добавлю тест на новую категорию.</p>",
+    "ts": "2026-07-13T01:05:56.255Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, <code class=\"inline\">exit_code</code> — <code class=\"inline\">omitempty</code>, значит для <code class=\"inline\">stopped</code> в JSON его не будет. Добавляю тест.</p>",
+    "ts": "2026-07-13T01:06:21.446Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All 16 тестов зелёные, включая новый на <code class=\"inline\">stopped</code>. Прогоню весь набор фронта на всякий случай.</p>",
+    "ts": "2026-07-13T01:06:56.049Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 105 тестов indie UI зелёные. Прогоняю полный Go-набор и типчек фронта для финальной проверки.</p>",
+    "ts": "2026-07-13T01:07:05.355Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё чисто. Обновлю <code class=\"inline\">PROJECT_MAP.md</code> (часть definition of done по CLAUDE.md).</p>",
+    "ts": "2026-07-13T01:07:37.632Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю память — это ценный сигнал о приоритетах пользователя на пре-лонч этапе.</p>",
+    "ts": "2026-07-13T01:08:01.593Z"
   }
 ]
