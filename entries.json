@@ -16961,5 +16961,95 @@
     "who": "claude",
     "html": "<p>Нашёл причину, и это не баг Grafana/Prometheus — Fleet у игры реально удалён (<code class=\"inline\">kubectl get fleets</code> — пусто), но метрики в <code class=\"inline\">/metrics</code> всё ещё висят на старых значениях.</p>",
     "ts": "2026-07-12T23:55:09.245Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это подтверждает известный, уже задокументированный пробел в самом coordinator&#x27;е, а не проблему Grafana. <code class=\"inline\">Fleet</code> для игры реально удалён (<code class=\"inline\">kubectl get fleets -A</code> → пусто), но в <code class=\"inline\">/metrics</code> всё ещё висят старые числа (<code class=\"inline\">desired=10, ready=10, cpu=32m...</code>).</p><p>Причина — в [exporter.go:71-84](internal/coordinator/metrics/exporter.go): <code class=\"inline\">Exporter.Observe</code> только **выставляет** гейджи по паре <code class=\"inline\">(cluster_id, game_id)</code>, но никогда не убирает их (<code class=\"inline\">DeleteLabelValues</code>), когда игра останавливается и Fleet удаляется. <code class=\"inline\">metrics.Collector</code> просто перестаёт вызывать <code class=\"inline\">Observe</code> для этой пары (Fleet&#x27;а больше нет — не с чего собирать), а Prometheus-гейдж в процессе coordinator&#x27;а как стоял на последнем значении, так и стоит — &quot;залипшая&quot; серия. Это прямо описано в doc-комментарии <code class=\"inline\">Observe</code> и отмечено в <code class=\"inline\">PROJECT_MAP.md</code> (п.66) как открытая задача — &quot;stale Prometheus-серии остановленных игр ⬜&quot;, ещё не реализовано.</p><p>Так что Grafana показывает ровно то, что реально в <code class=\"inline\">/metrics</code> — само значение не обновляется на источнике. Починить можно только в коде coordinator&#x27;а (<code class=\"inline\">Exporter.Observe</code>/<code class=\"inline\">Collector</code> должны звать <code class=\"inline\">DeleteLabelValues</code> при остановке игры) — это уже не разовая правка данных, а доработка метрик-пайплайна. Хочешь, чтобы я это реализовал?</p>",
+    "ts": "2026-07-12T23:55:20.020Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>почини</p>",
+    "ts": "2026-07-12T23:55:30.213Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь посмотрю <code class=\"inline\">collector_test.go</code>, чтобы понять, как тестируется <code class=\"inline\">Collector</code> и <code class=\"inline\">fakeCluster</code>.</p>",
+    "ts": "2026-07-12T23:55:59.143Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нужно добавить импорт <code class=\"inline\">uuid</code>.</p>",
+    "ts": "2026-07-12T23:56:46.940Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю <code class=\"inline\">collector.go</code>, чтобы он отслеживал исчезнувшие игры и звал <code class=\"inline\">Forget</code>.</p>",
+    "ts": "2026-07-12T23:56:55.671Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавлю diff-логику в <code class=\"inline\">collectOnce</code>.</p>",
+    "ts": "2026-07-12T23:57:08.402Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Собираю и гоняю тесты пакета <code class=\"inline\">metrics</code>.</p>",
+    "ts": "2026-07-12T23:57:26.977Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется и текущие тесты зелёные. Теперь добавлю тесты на сам фикс — что <code class=\"inline\">Forget</code> реально чистит серии и что <code class=\"inline\">Collector</code> его вызывает при исчезновении Fleet&#x27;а.</p>",
+    "ts": "2026-07-12T23:57:38.896Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю <code class=\"inline\">setSummaries</code> в <code class=\"inline\">fakeClusterSource</code> и тест на реальный сценарий (Fleet исчез → gauge вычищен).</p>",
+    "ts": "2026-07-12T23:58:03.159Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь применю обе правки: <code class=\"inline\">setSummaries</code> и отдельный хелпер экспортёра с доступом к реестру.</p>",
+    "ts": "2026-07-12T23:58:13.698Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>CLAUDE.md предупреждает про это: пакет <code class=\"inline\">metrics</code> целиком пропускается под <code class=\"inline\">-short</code> из-за <code class=\"inline\">dbtest.Start()</code> в <code class=\"inline\">TestMain</code> (даже мои новые non-DB тесты). Нужен полный прогон.</p>",
+    "ts": "2026-07-12T23:59:48.726Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 3 новых теста прошли. Теперь полный прогон пакета (без <code class=\"inline\">-short</code>, как требует CLAUDE.md для изменений семантики) и всей репы для страховки.</p>",
+    "ts": "2026-07-13T00:00:03.574Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Весь <code class=\"inline\">go test ./...</code> зелёный (только пакеты без тестов помечены <code class=\"inline\">?</code>). Теперь обновлю <code class=\"inline\">PROJECT_MAP.md</code> — по CLAUDE.md это часть definition of done.</p>",
+    "ts": "2026-07-13T00:01:21.134Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Не связано напрямую — это про провижининг кластеров, не про метрики. Пропускаю WHATIF.md, менять там нечего.</p>",
+    "ts": "2026-07-13T00:01:47.960Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — реализовал и протестировал фикс.</p><p>**Что сделано:**<br>- <code class=\"inline\">internal/coordinator/metrics/exporter.go</code> — новый метод <code class=\"inline\">Exporter.Forget(clusterID, gameID)</code>, чистит все 7 гейджей (<code class=\"inline\">DeleteLabelValues</code>) для одной пары <code class=\"inline\">(cluster_id, game_id)</code>.<br>- <code class=\"inline\">internal/coordinator/metrics/collector.go</code> — <code class=\"inline\">Collector</code> теперь хранит <code class=\"inline\">seenGames</code> (какие game id видел на прошлом тике для своего кластера) и на каждом тике диффит с текущим списком Fleet&#x27;ов: пропавшие (Stop/удаление Fleet&#x27;а) — зовёт <code class=\"inline\">Forget</code>, вместо того чтобы оставлять гейдж навечно залипшим на последнем значении.<br>- Тесты: <code class=\"inline\">TestExporter_ForgetRemovesAllGaugesForClusterAndGame</code>, <code class=\"inline\">TestExporter_ForgetLeavesOtherGamesUntouched</code>, <code class=\"inline\">TestCollector_ForgetsExporterGaugesWhenFleetDisappears</code> (последний реально гоняет <code class=\"inline\">Collector.Run</code> и проверяет, что серия пропадает из реестра Prometheus после исчезновения Fleet&#x27;а из fake-кластера).<br>- Полный <code class=\"inline\">go test ./...</code> зелёный, <code class=\"inline\">go vet</code> чист.<br>- <code class=\"inline\">PROJECT_MAP.md</code> (п.7) обновлён — задача &quot;stale Prometheus-серии остановленных игр&quot; перенесена из открытых в закрытые с описанием фикса.</p><p>**Важно:** это Go-код, а не runtime-конфиг — чтобы фикс реально заработал у тебя в dev-stack, нужно пересобрать и перезапустить процесс (<code class=\"inline\">make dev-stack</code> заново). Текущий запущенный <code class=\"inline\">bin/coordinator</code> (pid с 01:46) собран до этого изменения, так что залипшие сейчас <code class=\"inline\">ready_replicas=10</code> и т.п. для остановленной игры так и останутся висеть, пока процесс не перезапустится — это не новая проблема, это старый бинарь. Хочешь, чтобы я пересобрал и перезапустил dev-stack сейчас?</p>",
+    "ts": "2026-07-13T00:02:08.658Z"
   }
 ]
