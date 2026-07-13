@@ -19919,5 +19919,71 @@
     "who": "claude",
     "html": "<p>Запустил исследование виджета &quot;Deploy by region&quot;, жду результат перед изменениями.</p>",
     "ts": "2026-07-13T18:21:23.343Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Жду результат исследования — вернусь, когда агент закончит.</p>",
+    "ts": "2026-07-13T18:21:39.311Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>&lt;task-notification&gt;<br>&lt;task-id&gt;a82caa840226cf9e7&lt;/task-id&gt;<br>&lt;tool-use-id&gt;toolu_01UiM9FQHsJnGCDTTiBPExre&lt;/tool-use-id&gt;<br>&lt;output-file&gt;/tmp/claude-1000/-home-ihar-Games-ludarium-coordinator/ccac3002-8530-4477-84c1-21e86f915dba/tasks/a82caa840226cf9e7.output&lt;/output-file&gt;<br>&lt;status&gt;completed&lt;/status&gt;<br>&lt;summary&gt;Agent &quot;Найти Deploy by region виджет и список инстансов в нём&quot; finished&lt;/summary&gt;<br>&lt;note&gt;A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.&lt;/note&gt;<br>&lt;result&gt;## Итоги</p><p>### 1. Файл виджета<br><code class=\"inline\">/home/ihar/Games/ludarium/coordinator/dashboardui/src/features/overview/DeployStatusWidget.tsx</code> — единственный файл, содержит весь виджет &quot;Deployment by region&quot; (заголовок <code class=\"inline\">t(&#x27;deploy.title&#x27;)</code> = &quot;Deployment by region&quot;, строка 22). Виджет состоит из <code class=\"inline\">DeployStatusWidget</code> (строки 14-33, грид карточек по регионам) и <code class=\"inline\">RegionCard</code> (строки 35-140, один регион).</p><p>Используется только в одном месте: <code class=\"inline\">src/features/overview/OverviewTab.tsx:11</code> (<code class=\"inline\">&amp;lt;DeployStatusWidget gameId={gameId!} /&amp;gt;</code>). Больше нигде не импортируется.</p><p>### 2. Список инстансов внутри виджета — точные границы</p><p>- Рендер списка внутри <code class=\"inline\">RegionCard</code>: **строки 98–107** (<code class=\"inline\">&amp;lt;ul className=&quot;divide-y ...&quot;&amp;gt;...map(gs =&amp;gt; &amp;lt;GameServerRow .../&amp;gt;)&amp;lt;/ul&amp;gt;</code>).<br>- Компонент строки инстанса <code class=\"inline\">GameServerRow</code>: **строки 154–234** (отдельная функция ниже <code class=\"inline\">Stat</code>).<br>- Всё, что относится именно к списку/строке, а не к сводке: <code class=\"inline\">logsFor</code> state (строка 38), обработчики <code class=\"inline\">onLogs</code>/<code class=\"inline\">onSimulate</code> (переданные в <code class=\"inline\">GameServerRow</code>, строки 100-105), блок <code class=\"inline\">&amp;lt;LogDrawer&amp;gt;</code> для инстанса (строки 131-137, открывается по <code class=\"inline\">logsFor</code>), dev-кнопка «sim: player session» при нуле инстансов (строки 111-127, относится к пустому списку) и мутация <code class=\"inline\">simulate</code> (строки 54-57) и её текст ошибки (строки 108-110).</p><p>### 3. Типы и API</p><p>- <code class=\"inline\">GET /games/{gameId}/regions</code> → <code class=\"inline\">{ regions: GameRegion[] }</code> (строка 17) — список регионов, не относится к списку инстансов напрямую.<br>- <code class=\"inline\">GET /games/{gameId}/regions/{region}/status</code> → <code class=\"inline\">DeployStatus</code> (строка 41) — именно этот эндпоинт отдаёт <code class=\"inline\">game_servers: GameServerStatus[]</code>, из которого рендерится список.<br>- <code class=\"inline\">POST /games/{gameId}/regions/{region}/instances/{instance}/simulate</code> (строка 56) — dev-симулятор команд, относится только к строкам инстансов.<br>- <code class=\"inline\">POST /games/{gameId}/simulate-session</code> (строка 66) — относится к пустому списку (0 инстансов), не к самим строкам.<br>- Типы в <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/dashboardui/src/api/types.ts</code>:<br>  - <code class=\"inline\">GameServerStatus</code> (строки 76-94) — тип строки инстанса. Используется **только** в <code class=\"inline\">DeployStatusWidget.tsx</code> (импорт строка 4, использование строка 159).<br>  - <code class=\"inline\">DeployStatus</code> (строки 95-101) — тип ответа <code class=\"inline\">.../status</code>. Используется **только** в <code class=\"inline\">DeployStatusWidget.tsx</code> (строка 41). Поле <code class=\"inline\">game_servers</code> — единственное, что относится к списку; <code class=\"inline\">desired_replicas</code>/<code class=\"inline\">ready_replicas</code>/<code class=\"inline\">reserved_replicas</code>/<code class=\"inline\">allocated_replicas</code> — к сводке (последнее реально не читается напрямую в UI, &quot;in match&quot; считается через <code class=\"inline\">game_servers.filter</code>, см. ниже).<br>  - <code class=\"inline\">GameRegion</code> (строки 37-41) — не относится к списку инстансов, используется для сетки регионов.</p><p>### 4. Дочерние компоненты/функции — кандидаты на удаление вместе со списком</p><p>Используются **только** в контексте списка инстансов и больше нигде:<br>- <code class=\"inline\">GameServerRow</code> (DeployStatusWidget.tsx:154-234) — не экспортируется, не импортируется извне.<br>- Логика <code class=\"inline\">logsFor</code> / <code class=\"inline\">&amp;lt;LogDrawer&amp;gt;</code> для инстанса (строки 38, 131-137).<br>- Мутация <code class=\"inline\">simulate</code> (строки 54-57) и её обработка ошибки (108-110).<br>- Тип <code class=\"inline\">GameServerStatus</code> (api/types.ts:76-94) — нигде больше не используется.<br>- Поле <code class=\"inline\">game_servers</code> в <code class=\"inline\">DeployStatus</code> (api/types.ts:100) — если убирать список, но <code class=\"inline\">DeployStatus</code> как тип всё равно нужен для сводных счётчиков (desired/ready/reserved/allocated), просто без поля <code class=\"inline\">game_servers</code> (и без вычисления &quot;in match&quot;, которое зависит от <code class=\"inline\">game_servers</code>).<br>- Эндпоинты <code class=\"inline\">POST .../instances/{instance}/simulate</code> и связанные dev-кнопки (<code class=\"inline\">deploy.simStart</code>, <code class=\"inline\">deploy.simJoin</code>, <code class=\"inline\">deploy.simLeave</code>, <code class=\"inline\">deploy.simClose</code>) в <code class=\"inline\">GameServerRow</code> — используются только там.<br>- i18n-ключи, эксклюзивные для списка/строки: <code class=\"inline\">deploy.simStart</code>, <code class=\"inline\">deploy.simJoin</code>, <code class=\"inline\">deploy.simLeave</code>, <code class=\"inline\">deploy.simClose</code>, <code class=\"inline\">deploy.playersConnected</code>, <code class=\"inline\">deploy.imagePullHint</code>, <code class=\"inline\">deploy.portMismatch</code> (en.ts строки 143-177, не проверял ru-файл, но паттерн такой же).</p><p>### 5. НЕ трогать — используется в других местах</p><p>- <code class=\"inline\">describeServerState</code> и <code class=\"inline\">toneClass</code> (<code class=\"inline\">/home/ihar/Games/ludarium/coordinator/dashboardui/src/lib/serverState.ts</code>) — используются также в <code class=\"inline\">src/features/builds/TestInstancePanel.tsx:5,99,106</code> и <code class=\"inline\">toneClass</code> дополнительно в <code class=\"inline\">src/features/monitoring/MonitoringTab.tsx:9,140-155</code>. Не удалять, даже если удалить <code class=\"inline\">GameServerRow</code>.<br>- <code class=\"inline\">LogDrawer</code> (<code class=\"inline\">/home/ihar/Games/ludarium/coordinator/dashboardui/src/features/overview/LogDrawer.tsx</code>) — переиспользуется в <code class=\"inline\">SessionsWidget.tsx:6,100</code> и в <code class=\"inline\">MonitoringTab.tsx:8,387</code>. Общий компонент, не трогать.<br>- i18n-ключи <code class=\"inline\">deploy.matchStarted</code> и <code class=\"inline\">deploy.instanceLogs</code> — переиспользуются как текстовые строки в <code class=\"inline\">MonitoringTab.tsx</code> (строки 267, 320, 371). Если удалять эти ключи вместе с <code class=\"inline\">GameServerRow</code>, нужно либо оставить ключи (используются извне), либо завести отдельные ключи для <code class=\"inline\">MonitoringTab.tsx</code>.<br>- <code class=\"inline\">Stat</code> (DeployStatusWidget.tsx:142-149) и весь <code class=\"inline\">&amp;lt;dl&amp;gt;</code> сводки (строки 84-97) — часть виджета, которая остаётся (см. п.6), не удалять.<br>- Эндпоинты <code class=\"inline\">GET /games/{gameId}/regions</code> и <code class=\"inline\">GET /games/{gameId}/regions/{region}/status</code> (без поля <code class=\"inline\">game_servers</code>) нужны для сводки — сам виджет и <code class=\"inline\">RegionCard</code> остаются, меняется только то, что рендерится внутри.<br>- <code class=\"inline\">POST /games/{gameId}/simulate-session</code> и кнопка &quot;sim: player session&quot; (строки 63-68, 111-127) — это отдельная фича для пустого списка (ноль инстансов), логически смежная, но не часть списка строк как такового; решить отдельно, нужна ли она без списка (вероятно да, раз демонстрирует поведение при пустом флоте).</p><p>### 6. Что остаётся в компоненте помимо списка инстансов</p><p>- <code class=\"inline\">DeployStatusWidget</code> (строки 14-33): секция с заголовком, запрос списка регионов (<code class=\"inline\">GET /games/{id}/regions</code>), состояния загрузки/ошибки/пусто, грид <code class=\"inline\">RegionCard</code>.<br>- <code class=\"inline\">RegionCard</code> (строки 35-140) без списка: заголовок региона + бейдж &quot;not launched&quot; (72-75), состояния загрузки/ошибки статуса (77-80), сводные счётчики <code class=\"inline\">Stat</code> desired/ready/inMatch (84-97, все три завязаны на <code class=\"inline\">data</code> из <code class=\"inline\">DeployStatus</code>, но &quot;in match&quot; зависит от <code class=\"inline\">game_servers</code> — при удалении списка нужно решить, как считать этот счётчик без поля <code class=\"inline\">game_servers</code>, либо брать <code class=\"inline\">allocated_replicas</code> с бэкенда напрямую).<br>- <code class=\"inline\">Stat</code> (142-149) — вспомогательный компонент отображения одной метрики, используется только здесь (три раза), тоже не нужен нигде извне.</p><p>### Тесты</p><p>Тесты компонента: <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/dashboardui/src/features/overview/OverviewTab.test.tsx</code> (18 тест-кейсов в файле, три <code class=\"inline\">describe</code>-блока: <code class=\"inline\">OverviewTab</code>, <code class=\"inline\">LogDrawer</code>, <code class=\"inline\">dev-симулятор команд игры</code>). Тесты, относящиеся именно к списку инстансов (а не к сводке/сессиям):<br>- строки 63-75 (реплики + подсказки ImagePullBackOff/port-mismatch + &quot;не запущен&quot;)<br>- строки 77-91 (перевод k8s-состояний, не должны светиться сырые слова)<br>- строки 143-167 (stop очищает старые gs-строки)<br>- строки 225-236 (логи инстанса по имени GameServer, <code class=\"inline\">describe(&#x27;LogDrawer&#x27;, ...)</code>)<br>- строки 240-261 (<code class=\"inline\">describe(&#x27;dev-симулятор команд игры&#x27;)</code>: sim-кнопки в строке)<br>- строки 263-280 (бейдж match started)<br>- строки 282-299 (players_connected в строке)<br>- строки 301-324 (агрегат &quot;in match&quot; считает match_started)<br>- строки 326-342 (ошибка симуляции)<br>- строки 344-372 (ноль инстансов, кнопка sim: player session)</p><p>Тесты, НЕ относящиеся к списку (сводка/сессии/лончер), — не трогать при чистке списка: строки 93-107 (сессии), 109-121 (рестарт), 123-141 (launch по регионам), 169-174 (пустой список сессий), 193-223 (LogDrawer для сессии).</p><p>Других <code class=\"inline\">.test.tsx</code>, тестирующих <code class=\"inline\">GameServerRow</code>/список инстансов деплоя, нет — <code class=\"inline\">MonitoringTab.test.tsx</code> тестирует другой компонент (<code class=\"inline\">InstancesSection</code>) и его не нужно трогать.&lt;/result&gt;<br>&lt;usage&gt;&lt;subagent_tokens&gt;35621&lt;/subagent_tokens&gt;&lt;tool_uses&gt;17&lt;/tool_uses&gt;&lt;duration_ms&gt;1780118&lt;/duration_ms&gt;&lt;/usage&gt;<br>&lt;/task-notification&gt;</p>",
+    "ts": "2026-07-13T18:50:56.787Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь применяю правки. Начну с <code class=\"inline\">DeployStatusWidget.tsx</code>.</p>",
+    "ts": "2026-07-13T18:53:12.841Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">api/types.ts</code> — уберу <code class=\"inline\">GameServerStatus</code> и поле <code class=\"inline\">game_servers</code>.</p>",
+    "ts": "2026-07-13T18:53:38.493Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь уберу неиспользуемые i18n-ключи.</p>",
+    "ts": "2026-07-13T18:53:52.133Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю typecheck.</p>",
+    "ts": "2026-07-13T18:54:21.521Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тест &quot;stop переводит регион...&quot;.</p>",
+    "ts": "2026-07-13T18:54:48.246Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">baseHandlers()</code> — уберу <code class=\"inline\">game_servers</code> из мок-данных (больше не нужен), и удалю тест про логи инстанса деплоя + весь блок dev-симулятора.</p>",
+    "ts": "2026-07-13T18:55:18.967Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь уберу тест &quot;логи инстанса...&quot; из блока <code class=\"inline\">LogDrawer</code> и весь блок <code class=\"inline\">dev-симулятор команд игры</code>.</p>",
+    "ts": "2026-07-13T18:55:36.271Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю typecheck и прогоню тесты.</p>",
+    "ts": "2026-07-13T18:56:34.641Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 8 тестов проходят. Прогоню весь фронт целиком.</p>",
+    "ts": "2026-07-13T18:56:51.499Z"
   }
 ]
