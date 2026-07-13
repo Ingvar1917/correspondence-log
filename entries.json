@@ -19307,5 +19307,41 @@
     "who": "ihar",
     "html": "<p>фиксируем, не начинаем</p>",
     "ts": "2026-07-13T16:59:11.201Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понял, план зафиксирован в <code class=\"inline\">WHATIF.md</code>/<code class=\"inline\">PROJECT_MAP.md</code>, к реализации не приступаем. Если что-то понадобится продолжить — план уже записан и готов к работе в любой момент.</p>",
+    "ts": "2026-07-13T16:59:16.092Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>{<br>\t&quot;error&quot;: {<br>\t\t&quot;code&quot;: &quot;streaming_unsupported&quot;,<br>\t\t&quot;message&quot;: &quot;server does not support streaming&quot;<br>\t}<br>}</p><p>сейчас на фронте индюка</p>",
+    "ts": "2026-07-13T16:59:46.465Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл причину — регрессия от моей же правки этой сессии (HTTP RED-метрики). Объясню и сразу исправлю.</p><p><code class=\"inline\">httpMetrics.instrument()</code> оборачивает <code class=\"inline\">http.ResponseWriter</code> в <code class=\"inline\">statusRecorder{ResponseWriter: w}</code>, но <code class=\"inline\">statusRecorder</code> не реализует <code class=\"inline\">http.Flusher</code> — а именно на это полагаются SSE-эндпоинты (<code class=\"inline\">/dashboard/events</code> и <code class=\"inline\">/dashboard/.../logs/stream</code>), проверяя <code class=\"inline\">w.(http.Flusher)</code> перед стримингом. Раз обёртка не пробрасывает <code class=\"inline\">Flush()</code>, type assertion проваливается на **любом** запросе, прошедшем через middleware — не только на SSE, но раньше это было незаметно, потому что остальные хендлеры <code class=\"inline\">Flusher</code> не используют.</p>",
+    "ts": "2026-07-13T17:00:46.512Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавлю тест, доказывающий фикс и защищающий от повторной регрессии, и прогоню сборку/тесты.</p>",
+    "ts": "2026-07-13T17:01:01.817Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тест проходит (без фикса он бы упал на <code class=\"inline\">t.Fatal</code>). Прогоню полную сборку/тесты.</p>",
+    "ts": "2026-07-13T17:01:24.953Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Причина найдена и исправлена: <code class=\"inline\">cmd/coordinator/httpmetrics.go</code>&#x27;s <code class=\"inline\">statusRecorder</code> (добавлен этой сессией для HTTP RED-метрик) не пробрасывал <code class=\"inline\">Flush()</code>, из-за чего оба SSE-эндпоинта (<code class=\"inline\">/dashboard/events</code> — push-обновления дашборда, и <code class=\"inline\">/dashboard/.../logs/stream</code> — live-tail логов) стабильно падали с <code class=\"inline\">streaming_unsupported</code>. Добавлен метод <code class=\"inline\">Flush()</code>-делегат + регрессионный тест <code class=\"inline\">TestHTTPMetrics_ForwardsFlush</code> — без фикса он падает, с фиксом проходит. Сборка/vet/тесты чистые.</p><p>Это компилируемый Go-код — фикс не подхватится сам, пока не пересобрать и не перезапустить координатор. Проверю, крутится ли сейчас локальный стек.</p>",
+    "ts": "2026-07-13T17:01:42.936Z"
   }
 ]
