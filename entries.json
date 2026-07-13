@@ -17519,5 +17519,107 @@
     "who": "ihar",
     "html": "<p>это самый оптимальный вариант?</p>",
     "ts": "2026-07-13T01:16:28.812Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Честно — нет, не самый оптимальный. Я поторопился с первым вариантом. Разберу по-нормальному:</p><p>**Вариант A (то, что предложил) — парсить <code class=\"inline\">game_id</code> из первых 36 символов имени пода.**<br>Плюсы: вообще без обращений к k8s API, никакой гонки. Минусы: опирается на **недокументированное** поведение Agones (<code class=\"inline\">Pod.Name == GameServer.Name == &quot;&lt;fleetName&gt;-&lt;hash&gt;-&lt;random&gt;&quot;</code>) — в CLAUDE.md это уже помечено как «подтверждено по исходникам, не задокументировано в API» для другого места (live deploy-status). Заводить **вторую** независимую зависимость от того же недокументированного нейминга — но уже для персистентной истории (не live-статуса, который просто перезапросится на следующем тике) — не то чтобы «точнее», это в чистом виде компромисс, просто другого рода.</p><p>**Вариант B (лучше) — кэшировать <code class=\"inline\">game_id</code> в момент первого успешного резолва, не дёргать <code class=\"inline\">GetGameServer</code> заново на каждое событие.**<br>Сейчас <code class=\"inline\">handle()</code> вызывает живой <code class=\"inline\">GetGameServer</code> **на каждое** событие пода — и на «running»-сообщение (под точно свежий, GameServer почти наверняка ещё жив), и повторно на «terminated»/через <code class=\"inline\">Deleted</code> (вот тут-то GameServer обычно уже снесён — отсюда гонка). Если резолвить <code class=\"inline\">game_id</code> один раз при первом сообщении и класть результат в уже существующую dedup-мапу (<code class=\"inline\">recorded</code>), а на всех последующих событиях (включая <code class=\"inline\">Deleted</code>) переиспользовать закэшированное значение — гонка исчезает **без** какой-либо новой зависимости от недокументированных деталей: используются те же официальные данные (лейбл на объекте GameServer), просто читаются в безопасный момент, а не в опасный.</p><p>**Вариант C — B как основной путь + A как fallback**, если резолв не удался даже на первом сообщении (совсем уж патологический случай — под создался, а GameServer снесли мгновенно). Тогда просто не отдаём <code class=\"inline\">nil</code> навсегда, а пробуем детерминированный парсинг имени как последний шанс.</p><p>Я бы делал **B**, при желании перестраховаться — **C**. Что выбираешь?</p>",
+    "ts": "2026-07-13T01:17:21.319Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>геймсерверу не доверяем вообще, этож чужеродное</p>",
+    "ts": "2026-07-13T01:18:45.877Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Понял — убираю саму зависимость от <code class=\"inline\">GetGameServer</code>, не просто кэширую её результат. <code class=\"inline\">resolveGameID</code> будет работать только с тем, что <code class=\"inline\">Watcher</code> и так уже наблюдает через свой Watch (имя пода), без единого похода во внешний объект.</p>",
+    "ts": "2026-07-13T01:20:49.370Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь перепишу файл целиком с новой логикой резолва.</p>",
+    "ts": "2026-07-13T01:20:53.089Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — теперь правлю оба места вызова.</p>",
+    "ts": "2026-07-13T01:21:10.902Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь второй вызов в <code class=\"inline\">recordStopped</code>.</p>",
+    "ts": "2026-07-13T01:21:28.719Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку.</p>",
+    "ts": "2026-07-13T01:21:42.928Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь удаляю сам метод <code class=\"inline\">agones.Client.GetGameServer</code> — он стал полностью мёртвым кодом (единственный вызывающий только что убран).</p>",
+    "ts": "2026-07-13T01:21:58.928Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь удаляю тесты на этот метод и правлю фикстуры <code class=\"inline\">instances</code>-тестов (имена подов должны начинаться с реального UUID игры).</p>",
+    "ts": "2026-07-13T01:22:16.452Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо. Теперь правлю <code class=\"inline\">instances/watcher_test.go</code> — имена подов должны реально начинаться с UUID игры.</p>",
+    "ts": "2026-07-13T01:22:38.660Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю поле <code class=\"inline\">podName</code> в <code class=\"inline\">testHarness</code>.</p>",
+    "ts": "2026-07-13T01:23:15.875Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь заменяю оставшиеся литералы <code class=\"inline\">&quot;gs-abc123&quot;</code> на <code class=\"inline\">h.podName</code>.</p>",
+    "ts": "2026-07-13T01:23:27.648Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь проверю <code class=\"inline\">TestWatcher_ResolvesGameIDForStandaloneTestInstance</code> — там свой отдельный fixture.</p>",
+    "ts": "2026-07-13T01:23:44.227Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку тестов.</p>",
+    "ts": "2026-07-13T01:24:15.429Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All zelen. Прогоняю полный набор Go-тестов и vet по всему репо для страховки.</p>",
+    "ts": "2026-07-13T01:24:35.969Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю <code class=\"inline\">PROJECT_MAP.md</code> — ещё один найденный и исправленный баг в том же месте.</p>",
+    "ts": "2026-07-13T01:25:13.429Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Готово — убрал зависимость от <code class=\"inline\">GetGameServer</code> полностью, не просто закэшировал:**</p><p>- <code class=\"inline\">resolveGameID</code> теперь берёт <code class=\"inline\">game_id</code> **только** из <code class=\"inline\">Pod.Name</code> (первые 36 символов = UUID для Fleet-инстансов, <code class=\"inline\">test-</code>-префикс — для standalone Test Launch), никаких обращений к k8s API вообще.<br>- <code class=\"inline\">agones.Client.GetGameServer</code> удалён целиком — был единственный вызывающий, стал мёртвым кодом; убраны и его тесты.<br>- <code class=\"inline\">PodWatcher</code>-интерфейс в <code class=\"inline\">instances</code> package лишился этого метода.<br>- Тестовый harness (<code class=\"inline\">watcher_test.go</code>) переделан: имена подов теперь реально имеют вид <code class=\"inline\">&lt;gameID&gt;-&lt;hash&gt;-&lt;random&gt;</code>, фиктивный <code class=\"inline\">GameServer</code>-объект больше не нужен нигде.<br>- <code class=\"inline\">TestWatcher_ResolvesGameIDForStandaloneTestInstance</code> упростился — теперь переиспользует <code class=\"inline\">newHarness</code> вместо дублирования сидинга.<br>- <code class=\"inline\">go build</code>, <code class=\"inline\">go vet</code>, полный <code class=\"inline\">go test ./...</code> — всё зелёное.<br>- <code class=\"inline\">PROJECT_MAP.md</code> обновлён — описал оба сегодняшних бага в одном месте (они физически рядом в коде).</p><p>Итого в этой сессии в <code class=\"inline\">instances.Watcher</code> закрыто два независимых бага: (1) <code class=\"inline\">Deleted</code>-без-<code class=\"inline\">Terminated</code> не писал термінацию вообще → категория <code class=\"inline\">stopped</code>; (2) <code class=\"inline\">game_id</code> мог тихо потеряться из-за гонки с живым <code class=\"inline\">GetGameServer</code> → теперь детерминированный парсинг имени, зависимости от GameServer как источника нет вовсе.</p><p>Как и раньше — это всё требует пересборки и рестарта <code class=\"inline\">bin/coordinator</code>, чтобы реально заработать на твоём dev-stack. Пересобрать и перезапустить сейчас, заодно с тем, что копилось раньше (tariff_id-лейбл)?</p>",
+    "ts": "2026-07-13T01:25:50.047Z"
   }
 ]
