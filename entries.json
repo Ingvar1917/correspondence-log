@@ -26981,5 +26981,167 @@
     "who": "claude",
     "html": "<p>Всё на месте, ничего лишнего не осталось (временный <code class=\"inline\">cmd/cachedebug</code> удалён, port-forward остановлен).</p><p>## Итог</p><p>Bridge-sidecar теперь распространяется через ту же инфраструктуру, что и тенантские образы:</p><p>- <code class=\"inline\">bridge-sidecar:dev</code> пушится в центральный registry (<code class=\"inline\">registry.coordinator.svc.cluster.local:5000/bridge-sidecar:dev</code>) вместо голого <code class=\"inline\">kind load</code>-тега — правки в <code class=\"inline\">setup-dev-extras.sh</code>, <code class=\"inline\">deploy/local/app.yaml</code>, <code class=\"inline\">deploy/local/dev-stack.sh</code>. Новой инфраструктуры не потребовалось — просто едет через уже готовый pull-through cache.<br>- Живьём: собрал и запушил образ, точечно пропатчил зависший под (подтвердил, что путь пуллится), пересобрал и передеплоил сам coordinator (заодно синхронизировал живую БД с миграциями 000053/000054), допатчил Fleet-темплейт игры в <code class=\"inline\">eu</code> напрямую — Agones пересоздал GameServer: **<code class=\"inline\">3/3 Running</code>, <code class=\"inline\">STATE=Ready</code>**, без единого ручного патча пода.<br>- Полный <code class=\"inline\">go build</code>/<code class=\"inline\">go vet</code>/<code class=\"inline\">go test ./...</code> — зелёный.<br>- <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">WHATIF.md</code> обновлены.</p><p>Заодно всплыл отдельный, не связанный баг: kubeconfig кластера <code class=\"inline\">eu</code> в <code class=\"inline\">cluster_registry</code> хранит адрес <code class=\"inline\">127.0.0.1:&lt;порт&gt;</code> — работает при обращении с хоста, но не из пода самого coordinator&#x27;а (другой network namespace), поэтому его фоновые watch-циклы для <code class=\"inline\">eu</code> не поднимаются. Не чинил — задокументировал в WHATIF.md как отдельную задачу, не относящуюся к registry-cache/bridge-sidecar.</p><p>Коммит-сообщение для этого блока:<br>\u0000FENCE0\u0000</p>",
     "ts": "2026-07-13T23:20:10.422Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>почини баг</p>",
+    "ts": "2026-07-13T23:20:43.907Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Прогоняю <code class=\"inline\">test-e2e-provisioning</code> — он живьём поднимает и сносит одноразовый kind-кластер и вызывает <code class=\"inline\">GetKubeconfig</code> в реальном сценарии.</p>",
+    "ts": "2026-07-13T23:27:47.342Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогон повторился с тем же результатом — это не флейк, а детерминированный race, не связанный с моим изменением kubeconfig. Разбираюсь.</p>",
+    "ts": "2026-07-13T23:31:56.572Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл: фикс «job пишется до <code class=\"inline\">CreateCluster</code>» (2026-07-13) открыл race — фоновый поллер видит строку с пустым <code class=\"inline\">external_cluster_id</code> ещё до того, как синхронный <code class=\"inline\">kind create cluster</code> (15-20с) успевает вернуться, и <code class=\"inline\">KindAdapter.GetCluster(&quot;&quot;)</code> трактует это как «кластер не найден» → job помечается <code class=\"inline\">failed</code> навсегда. Это не связано с моей правкой kubeconfig, но детерминированно ломает весь провижининг через kind. Чиню.</p>",
+    "ts": "2026-07-13T23:32:10.775Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл проблему в самом тесте — не в фиксе. Мой фейк всегда возвращает <code class=\"inline\">ClusterStateError</code> независимо от переданного ID, поэтому после того как <code class=\"inline\">Launch</code> реально завершается и <code class=\"inline\">external_cluster_id</code> перестаёт быть пустым, job закономерно фейлится по РЕАЛЬНОЙ (но не той, что я хотел проверить) причине. Поправляю тест.</p>",
+    "ts": "2026-07-13T23:37:25.101Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь тест зелёный. Проверяю, что он реально ловит регрессию — временно откатываю фикс и убеждаюсь, что тест падает.</p>",
+    "ts": "2026-07-13T23:37:52.821Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Мой тест полагается на реальный тайминг горутин и оказался нестабильным (не воспроизводит race детерминированно, особенно под <code class=\"inline\">t.Parallel()</code>). Делаю его надёжным — увеличиваю окно и уменьшаю интервал тика.</p>",
+    "ts": "2026-07-13T23:39:05.527Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Фикс на месте. Теперь делаю тест устойчивым к timing/scheduling contention под <code class=\"inline\">t.Parallel()</code>.</p>",
+    "ts": "2026-07-13T23:39:15.074Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, сигнатура совпадает. Прогоняю тест с фиксом, затем без фикса — несколько раз для проверки стабильности.</p>",
+    "ts": "2026-07-13T23:40:08.298Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Стабильно зелёный с фиксом. Теперь убираю фикс и проверяю, что тест ловит регрессию воспроизводимо (несколько прогонов).</p>",
+    "ts": "2026-07-13T23:40:32.259Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Опять та же ошибка — я поставил <code class=\"inline\">ClusterStateProvisioning</code>, который вообще не фейлит job независимо от фикса. Нужен <code class=\"inline\">ClusterStateError</code> (как реально отвечает <code class=\"inline\">KindAdapter</code> на пустой ID), проверка — только пока <code class=\"inline\">proceed</code> заблокирован.</p>",
+    "ts": "2026-07-13T23:42:30.475Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Фикс восстановлен. Правлю тест.</p>",
+    "ts": "2026-07-13T23:42:34.835Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Сначала проверяю без фикса (тест должен воспроизводимо падать):</p>",
+    "ts": "2026-07-13T23:42:55.183Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 3 прогона падают без фикса — регрессия воспроизводится надёжно. Восстанавливаю фикс и проверяю обратное.</p>",
+    "ts": "2026-07-13T23:44:13.344Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тест теперь надёжно ловит регрессию и стабильно проходит с фиксом. Прогоняю полный пакет и весь набор тестов.</p>",
+    "ts": "2026-07-13T23:44:47.546Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогон полного набора тестов вскрыл ещё один, третий и не связанный баг — в <code class=\"inline\">dashboardevents</code>. Смотрю, что там сломано.</p>",
+    "ts": "2026-07-13T23:47:28.808Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба нужно поправить — добавить <code class=\"inline\">WHERE ended_at IS NULL</code>, как в реальном коде репозитория после миграции 000052.</p>",
+    "ts": "2026-07-13T23:47:44.361Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все зелёные. Финальный полный прогон всего репозитория с чистым кэшем.</p>",
+    "ts": "2026-07-13T23:48:13.577Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полностью зелёный, с холодным кэшем. Теперь очищаю рабочие артефакты и обновляю документацию.</p>",
+    "ts": "2026-07-13T23:49:27.719Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю и живые данные — у уже зарегистрированного <code class=\"inline\">eu</code> в <code class=\"inline\">cluster_registry</code> всё ещё старый <code class=\"inline\">127.0.0.1</code> kubeconfig, фикс в коде касается только новых кластеров.</p>",
+    "ts": "2026-07-13T23:49:43.433Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Кубеконфиг рабочий. Обновляю запись в БД.</p>",
+    "ts": "2026-07-13T23:50:16.376Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю, что фоновые watch-циклы coordinator&#x27;а для <code class=\"inline\">eu</code> действительно ожили.</p>",
+    "ts": "2026-07-13T23:50:28.542Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полностью чистый лог — никаких ошибок для <code class=\"inline\">eu</code>. Оба уровня фикса подтверждены живьём.</p>",
+    "ts": "2026-07-13T23:51:18.002Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё чисто, никаких временных инструментов не осталось. Обновляю <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">WHATIF.md</code> последним разом с фиксами kubeconfig и race.</p>",
+    "ts": "2026-07-13T23:51:33.157Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь строка про race-фикс рядом с описанием фикса от 07-13:</p>",
+    "ts": "2026-07-13T23:52:44.482Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальная проверка всего репозитория после правок документации.</p>",
+    "ts": "2026-07-13T23:53:21.293Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё чисто.</p><p>## Итог</p><p>Три бага в итоге, все проверены живьём:</p><p>1. **Bridge-sidecar** — образ теперь идёт через центральный registry + pull-through cache, <code class=\"inline\">eu</code> получил <code class=\"inline\">Ready</code> GameServer.<br>2. **Кубеконфиг <code class=\"inline\">eu</code> адресован <code class=\"inline\">127.0.0.1</code>** — не резолвится из пода координатора. <code class=\"inline\">KindAdapter.GetKubeconfig</code> теперь берёт <code class=\"inline\">kind get kubeconfig --internal</code> и подменяет Docker-хостнейм на реальный IP control-plane контейнера — единственный адрес, работающий одинаково и с хоста, и из пода другого kind-кластера. Проверено живьём **со строгой TLS-валидацией** с обеих сторон. Живая запись <code class=\"inline\">eu</code> в БД перешифрована; после рестарта <code class=\"inline\">deployment/app</code> watch-циклы для <code class=\"inline\">eu</code> больше не логируют ошибок.<br>3. **Попутно найден и закрыт race в <code class=\"inline\">provisioning.Manager</code>** (не связан с кубеконфигом, всплыл при верификации через <code class=\"inline\">test-e2e-provisioning</code>): фикс от 07-13 «job пишется до <code class=\"inline\">CreateCluster</code>» открыл окно, где фоновый поллер видит job с пустым <code class=\"inline\">external_cluster_id</code> и детерминированно (не флейково) фейлит его — <code class=\"inline\">KindAdapter.GetCluster(&quot;&quot;)</code> отвечает не Go-ошибкой, а валидным <code class=\"inline\">ClusterStateError</code>. Тест был сломан на 100% с 07-13, просто не перегонялся живьём. Исправлено — <code class=\"inline\">advance()</code> пропускает job с пустым ID.<br>4. **Бонус**: холодный <code class=\"inline\">go test ./...</code> вскрыл стухший тест в <code class=\"inline\">dashboardevents</code> (свой рукописный <code class=\"inline\">ON CONFLICT</code>, не обновлённый под партиальный индекс 000052) — поправлен.</p><p>Живой <code class=\"inline\">test-e2e-provisioning</code> (create→ready→drain→delete на реальном kind-кластере) — <code class=\"inline\">PASS</code>, дважды подряд. Полный <code class=\"inline\">go test ./...</code> с холодным кэшем — зелёный. <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">WHATIF.md</code> обновлены, все временные debug-инструменты удалены.</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-13T23:53:41.057Z"
   }
 ]
