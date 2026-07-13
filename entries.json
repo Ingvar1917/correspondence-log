@@ -17849,5 +17849,113 @@
     "who": "claude",
     "html": "<p>Разобрался — это конкретный, воспроизводимый разрыв в <code class=\"inline\">provisioning.Manager.Launch</code>, не общая невезуха.</p>",
     "ts": "2026-07-13T10:22:44.562Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Корень:** <code class=\"inline\">provisioner.CreateCluster</code> (реальное создание кластера в облаке/<code class=\"inline\">kind</code>) идёт **до** <code class=\"inline\">m.jobs.Create</code> (запись Job в БД, <code class=\"inline\">manager.go:86-99</code>). Если coordinator падает/убивается ровно в этом окне — физический кластер уже есть, а у нас нет вообще ничего: ни строки в <code class=\"inline\">provisioning_jobs</code>, ни тем более в <code class=\"inline\">cluster_registry</code> (та пишется ещё позже, в <code class=\"inline\">finish()</code>, после успешной установки Agones). Дальше ничто и никогда это не подхватит само — ровно так родился <code class=\"inline\">coordinator-asia</code>.</p><p>Варианты:</p><p>1. **Перевернуть порядок — сначала пишем Job, потом создаём кластер.** Имя кластера детерминировано (<code class=\"inline\">&quot;coordinator-&quot;+region</code>) и известно ДО вызова облака — можно завести Job (<code class=\"inline\">status=provisioning</code>, <code class=\"inline\">external_cluster_id</code> nullable) первым делом, а <code class=\"inline\">external_cluster_id</code> дописать после успешного <code class=\"inline\">CreateCluster</code>. Тогда крэш в любой точке оставляет видимый след (Job виден админу/поллеру <code class=\"inline\">Run()</code>), а не полную пустоту. Маленький диф, но сам «зависший провижининг» (крэш ещё до ответа облака) всё равно нужно будет чем-то закрывать — таймаутом на старые <code class=\"inline\">provisioning</code>-джобы или ручным подтверждением.</p><p>2. **Периодическая сверка (reconciliation)** — сравнивать реальный список кластеров у каждого облака (у всех детерминированное имя, значит list-by-name работает одинаково для kind/DO/Vultr/OVH) с тем, что знает <code class=\"inline\">cluster_registry</code>/<code class=\"inline\">provisioning_jobs</code>, и подсвечивать несовпадения. Ловит вообще любое расхождение, не только эту гонку — ручное <code class=\"inline\">kind create cluster</code> мимо coordinator&#x27;а, недоделанный delete и т.п. Дороже: нужен отдельный периодический джоб и решение, что делать с найденным сиротой (по умолчанию я бы — только алёрт/лог, не автоудаление и не автопривязка, тот же осторожный тон, что уже в остальной логике provisioning).</p><p>Я бы делал (1) как дешёвый фикс конкретной гонки + (2) как страховку от всего остального. Что скажешь?</p>",
+    "ts": "2026-07-13T10:23:03.112Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>давай сделаем 1, тест под этот кейс напиши</p>",
+    "ts": "2026-07-13T10:24:00.428Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Реализую: переставляю порядок (Job пишется до <code class=\"inline\">CreateCluster</code>), плюс <code class=\"inline\">MarkFailed</code> при ошибке облака. Начинаю с миграции и репозитория.</p>",
+    "ts": "2026-07-13T10:26:39.838Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">provisioning.go</code> — меняю <code class=\"inline\">Create</code>, добавляю <code class=\"inline\">SetExternalClusterID</code>.</p>",
+    "ts": "2026-07-13T10:27:10.696Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">manager.go</code> — переставляю порядок в <code class=\"inline\">Launch</code>.</p>",
+    "ts": "2026-07-13T10:27:27.063Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю компиляцию.</p>",
+    "ts": "2026-07-13T10:27:49.983Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Правлю тесты репозитория.</p>",
+    "ts": "2026-07-13T10:28:04.093Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь остальные вызовы <code class=\"inline\">repo.Create</code> в этом файле (без изменения смысла — просто убрать 3-й аргумент).</p>",
+    "ts": "2026-07-13T10:28:18.523Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All calls updated. Теперь <code class=\"inline\">manager_test.go</code> — добавляю hook в fake provisioner и новый тест на порядок.</p>",
+    "ts": "2026-07-13T10:28:29.577Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю <code class=\"inline\">TestLaunch_PropagatesCreateClusterError</code> (проверить, что Job теперь помечен <code class=\"inline\">failed</code>) и добавляю новый тест на порядок операций.</p>",
+    "ts": "2026-07-13T10:29:00.953Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогоняю тесты пакета.</p>",
+    "ts": "2026-07-13T10:29:19.264Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогоняю весь пакет и ищу другие места, где могла использоваться сигнатура <code class=\"inline\">Repository.Create</code>.</p>",
+    "ts": "2026-07-13T10:29:46.508Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Других вызывающих нет. Прогоняю полный набор тестов и миграцию целиком.</p>",
+    "ts": "2026-07-13T10:30:00.237Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ещё один вызывающий нашёлся в <code class=\"inline\">admindashboard/handlers_test.go</code>. Правлю.</p>",
+    "ts": "2026-07-13T10:30:34.236Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто. Прогоняю полный набор тестов.</p>",
+    "ts": "2026-07-13T10:31:15.757Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Проверю <code class=\"inline\">gofmt</code> (чтобы не повторить утренний прокол с CI).</p>",
+    "ts": "2026-07-13T10:31:36.701Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто. Обновлю <code class=\"inline\">PROJECT_MAP.md</code> — отмечу закрытие этого пункта.</p>",
+    "ts": "2026-07-13T10:31:44.891Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Найдено правильное место — раздел 6, п. <code class=\"inline\">⚠️ Ни один реальный DO/Vultr/OVH-кластер...</code>. Добавляю новый пункт про сегодняшний фикс порядка.</p>",
+    "ts": "2026-07-13T10:32:02.607Z"
   }
 ]
