@@ -17957,5 +17957,23 @@
     "who": "claude",
     "html": "<p>Найдено правильное место — раздел 6, п. <code class=\"inline\">⚠️ Ни один реальный DO/Vultr/OVH-кластер...</code>. Добавляю новый пункт про сегодняшний фикс порядка.</p>",
     "ts": "2026-07-13T10:32:02.607Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё чисто: build/vet/gofmt/полный <code class=\"inline\">go test ./...</code> зелёные.</p><p>**Готово:**<br>- <code class=\"inline\">provisioning.Repository.Create(cloud, region)</code> — больше не требует <code class=\"inline\">external_cluster_id</code> (тот не известен реальным облакам до ответа <code class=\"inline\">CreateCluster</code>), пишется первым, до похода в облако.<br>- Новый <code class=\"inline\">Repository.SetExternalClusterID</code> — бэкфиллит id после успешного <code class=\"inline\">CreateCluster</code>.<br>- <code class=\"inline\">Manager.Launch</code> переставлен: Job → <code class=\"inline\">CreateCluster</code> → бэкфилл id (было наоборот); при ошибке облака — <code class=\"inline\">MarkFailed</code>, а не пустота.<br>- Миграция 000048 — дефолт <code class=\"inline\">&#x27;&#x27;</code> на колонке.<br>- Тесты: <code class=\"inline\">TestLaunch_PersistsJobBeforeCreatingCluster</code> — доказывает порядок напрямую (фейковый <code class=\"inline\">CreateCluster</code> читает реальную БД изнутри себя, до возврата), <code class=\"inline\">TestLaunch_PropagatesCreateClusterError</code> расширен, плюс тесты на <code class=\"inline\">SetExternalClusterID</code>.<br>- <code class=\"inline\">PROJECT_MAP.md</code> обновлён.</p><p>Осталось незакрытым сознательно (сказал в самом описании) — более широкий класс расхождений (ручное создание кластера мимо coordinator&#x27;а, как сам <code class=\"inline\">coordinator-asia</code> физически и появился) всё ещё не ловится ничем: это вариант (2) — периодическая сверка, отдельная задача. Коммитить не стал.</p>",
+    "ts": "2026-07-13T10:32:38.120Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>расскажи что делает тест под этот кейс, что он проверяет?</p>",
+    "ts": "2026-07-13T10:33:00.384Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">TestLaunch_PersistsJobBeforeCreatingCluster</code> — это прямое доказательство порядка операций, не проверка конечного состояния. Механика:</p>",
+    "ts": "2026-07-13T10:33:10.091Z"
   }
 ]
