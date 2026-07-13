@@ -19901,5 +19901,23 @@
     "who": "claude",
     "html": "<p>Все 24 теста проходят. Финальный полный прогон.</p>",
     "ts": "2026-07-13T18:17:36.216Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Только преэкзистентная проблема (не моя). Всё зелёное. Итог:</p><p>**Backend:**<br>- <code class=\"inline\">launcher.StopInstance(ctx, gameID, accountID, region, instance)</code> (<code class=\"inline\">restart.go</code>) — force-delete GameServer&#x27;а, тот же механизм, что у <code class=\"inline\">RestartInstance</code>, но keyed по <code class=\"inline\">region</code>+имени инстанса (через уже существующий <code class=\"inline\">resolveOwnedInstance</code>, тот же, что у <code class=\"inline\">StreamInstanceLogs</code>), а не по <code class=\"inline\">session_id</code> — у Ready-инстанса сессии может ещё не быть.<br>- <code class=\"inline\">POST /games/{id}/regions/{region}/instances/{instance}/stop</code> (<code class=\"inline\">handleStopInstance</code>).</p><p>**Frontend:** кнопка **Stop** появляется только у по-настоящему работающих строк (<code class=\"inline\">isInstanceRunning</code>, требует <code class=\"inline\">region</code>), шлёт <code class=\"inline\">POST</code> и инвалидирует кэш инстансов.</p><p>Тесты: 2 в <code class=\"inline\">launcher</code> (свой инстанс удаляется, чужой — <code class=\"inline\">ErrInstanceNotFound</code>), 1 в <code class=\"inline\">dashboardapi</code> (200/404), 3 новых в vitest. Полный <code class=\"inline\">go test ./...</code>, <code class=\"inline\">go vet</code>, <code class=\"inline\">tsc</code> и весь vitest-набор — зелёные.</p>",
+    "ts": "2026-07-13T18:18:15.129Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>из блока Deployment by region убери список инстансов и почисти код от этого функционала на этой странице</p>",
+    "ts": "2026-07-13T18:20:51.970Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Запустил исследование виджета &quot;Deploy by region&quot;, жду результат перед изменениями.</p>",
+    "ts": "2026-07-13T18:21:23.343Z"
   }
 ]
