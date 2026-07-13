@@ -17621,5 +17621,17 @@
     "who": "claude",
     "html": "<p>**Готово — убрал зависимость от <code class=\"inline\">GetGameServer</code> полностью, не просто закэшировал:**</p><p>- <code class=\"inline\">resolveGameID</code> теперь берёт <code class=\"inline\">game_id</code> **только** из <code class=\"inline\">Pod.Name</code> (первые 36 символов = UUID для Fleet-инстансов, <code class=\"inline\">test-</code>-префикс — для standalone Test Launch), никаких обращений к k8s API вообще.<br>- <code class=\"inline\">agones.Client.GetGameServer</code> удалён целиком — был единственный вызывающий, стал мёртвым кодом; убраны и его тесты.<br>- <code class=\"inline\">PodWatcher</code>-интерфейс в <code class=\"inline\">instances</code> package лишился этого метода.<br>- Тестовый harness (<code class=\"inline\">watcher_test.go</code>) переделан: имена подов теперь реально имеют вид <code class=\"inline\">&lt;gameID&gt;-&lt;hash&gt;-&lt;random&gt;</code>, фиктивный <code class=\"inline\">GameServer</code>-объект больше не нужен нигде.<br>- <code class=\"inline\">TestWatcher_ResolvesGameIDForStandaloneTestInstance</code> упростился — теперь переиспользует <code class=\"inline\">newHarness</code> вместо дублирования сидинга.<br>- <code class=\"inline\">go build</code>, <code class=\"inline\">go vet</code>, полный <code class=\"inline\">go test ./...</code> — всё зелёное.<br>- <code class=\"inline\">PROJECT_MAP.md</code> обновлён — описал оба сегодняшних бага в одном месте (они физически рядом в коде).</p><p>Итого в этой сессии в <code class=\"inline\">instances.Watcher</code> закрыто два независимых бага: (1) <code class=\"inline\">Deleted</code>-без-<code class=\"inline\">Terminated</code> не писал термінацию вообще → категория <code class=\"inline\">stopped</code>; (2) <code class=\"inline\">game_id</code> мог тихо потеряться из-за гонки с живым <code class=\"inline\">GetGameServer</code> → теперь детерминированный парсинг имени, зависимости от GameServer как источника нет вовсе.</p><p>Как и раньше — это всё требует пересборки и рестарта <code class=\"inline\">bin/coordinator</code>, чтобы реально заработать на твоём dev-stack. Пересобрать и перезапустить сейчас, заодно с тем, что копилось раньше (tariff_id-лейбл)?</p>",
     "ts": "2026-07-13T01:25:50.047Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>почисти из базы старые инстансы</p>",
+    "ts": "2026-07-13T01:26:08.561Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 41 строки в <code class=\"inline\">gameserver_instances</code> — это накопленный за сегодняшнюю сессию тестовый мусор (30 с <code class=\"inline\">game_id IS NULL</code> из бага гонки, 10 «зависших running» из бага с <code class=\"inline\">Deleted</code>, ещё немного нормальных завершений) — реальных данных, которые жалко потерять, тут нет. Чищу таблицу целиком.</p>",
+    "ts": "2026-07-13T01:26:46.677Z"
   }
 ]
