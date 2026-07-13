@@ -22577,5 +22577,83 @@
     "who": "claude",
     "html": "<p>Хорошее возражение — 30-60-минутный цикл реконнекта не объясняет расхождение за 2 минуты. Моя теория была неверной, перепроверяю по коду.</p>",
     "ts": "2026-07-13T20:57:53.980Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Пересчитал — вы правы, 30-60 минут это не объясняет. Другая причина, подтверждается прямо чтением кода: дело не в реконнекте watch&#x27;а, а в том, что <code class=\"inline\">Watcher.recorded</code> — обычная in-memory мапа, ключ **<code class=\"inline\">pod.Name</code>** ([watcher.go:97-101](internal/coordinator/instances/watcher.go#L97-L101)):</p><pre><code>// Agones never reuses a Pod name, so this stays bounded to\n// currently-live (+ recently-terminated) pods.\nrecorded map[string]podRecordState\n</code></pre><p>Комментарий говорит &quot;Agones никогда не переиспользует имя пода&quot; — это верно для **Fleet**-подов (случайный хэш в имени), но **не верно для Test Launch**: там имя детерминированное, <code class=\"inline\">test-&lt;gameID&gt;</code>, и при повторном запуске новый под получает **точно то же имя**, что и предыдущий.</p><p>Гонка:<br>1. Старый тестовый под живёт, <code class=\"inline\">w.recorded[&quot;test-&lt;gameID&gt;&quot;]</code> = <code class=\"inline\">{running: true, confirmedRunning: true}</code>.<br>2. Вы стопаете и сразу перезапускаете — новый под создаётся под тем же именем.<br>3. Если событие &quot;старый под Deleted&quot; (которое чистит запись, <code class=\"inline\">delete(w.recorded, pod.Name)</code>, [watcher.go:139](internal/coordinator/instances/watcher.go#L139)) обработается **позже**, чем первое событие нового пода (Pending/Running) — новый под наткнётся на **чужую, ещё не вычищенную** запись от старого. Условие пропуска:<br>\u0000FENCE1\u0000<br>— срабатывает, <code class=\"inline\">UpsertRunning</code> для нового пода не вызывается. А следующего события для него может и не быть (переход Pending→Running обычно шлётся один раз) — запись так и остаётся с <code class=\"inline\">NULL</code>/<code class=\"inline\">NULL</code> навсегда, ровно то, что мы видим в БД.</p><p>Это не связано с 30-60-минутным циклом апи-сервера вообще — чистая гонка двух разных k8s-объектов (разный UID), делящих одно имя, обрабатываемых нашим кодом без учёта UID. При 3 запусках за 2 минуты порядок доставки Delete-старого/Added-нового не гарантирован — отсюда и &quot;то да, то нет&quot;.</p><p>Правильный фикс — ключить <code class=\"inline\">w.recorded</code> не голым <code class=\"inline\">pod.Name</code>, а парой <code class=\"inline\">(pod.Name, pod.UID)</code> (или просто <code class=\"inline\">pod.UID</code>), чтобы новый физический под никогда не наследовал состояние предыдущего. Чинить?</p>",
+    "ts": "2026-07-13T20:58:52.161Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>да</p>",
+    "ts": "2026-07-13T21:00:37.387Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now update all five map access sites to key by <code class=\"inline\">pod.UID</code>.</p>",
+    "ts": "2026-07-13T21:01:20.990Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the remaining two occurrences (<code class=\"inline\">recordTermination</code>&#x27;s dedup block and <code class=\"inline\">recordEvicted</code>&#x27;s).</p>",
+    "ts": "2026-07-13T21:01:43.745Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All 5 sites converted, compiles clean. Now let&#x27;s run the instances test suite and add a regression test proving the exact race is fixed.</p>",
+    "ts": "2026-07-13T21:02:11.576Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now inserting the new regression test right before this one.</p>",
+    "ts": "2026-07-13T21:03:28.386Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Let&#x27;s verify the test actually catches the regression (temporarily reverting the fix).</p>",
+    "ts": "2026-07-13T21:03:58.400Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Confirmed: fails without the fix (times out — new pod&#x27;s sighting is silently dropped), passes with it. Restoring the fix.</p>",
+    "ts": "2026-07-13T21:04:15.314Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Fix restored, full package passes. Now the full build/test sweep.</p>",
+    "ts": "2026-07-13T21:04:32.889Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Обновлю PROJECT_MAP.md/WHATIF.md, раз этот баг реально нашли и починили живым тестированием — сверю, куда именно это лучше вписать.</p>",
+    "ts": "2026-07-13T21:04:47.746Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю строку в конец таблицы.</p>",
+    "ts": "2026-07-13T21:05:21.564Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>This is the last line (line 44, EOF). Appending the new row after it.</p>",
+    "ts": "2026-07-13T21:05:26.445Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Итог по этой цепочке диагностики:</p><p>- **Найдена и исправлена** реальная гонка в <code class=\"inline\">instances.Watcher</code>: dedup-мапа <code class=\"inline\">recorded</code> была ключом <code class=\"inline\">pod.Name</code>, что верно для Fleet-подов, но не для Test Launch (детерминированное имя <code class=\"inline\">test-&lt;gameID&gt;</code>, переиспользуется при быстром stop+relaunch). Новый под под тем же именем мог унаследовать чужое <code class=\"inline\">running/confirmedRunning</code> состояние от старого и молча пропустить свою собственную запись — <code class=\"inline\">container_started_at</code> оставался <code class=\"inline\">NULL</code> навсегда, хотя контейнер реально работал.<br>- Фикс: ключ мапы сменён на <code class=\"inline\">pod.UID</code> — новый физический под всегда стартует с чистого состояния, вне зависимости от переиспользованного имени.<br>- Тест <code class=\"inline\">TestWatcher_ReusedPodNameDoesNotInheritStalePriorPodState</code> — воспроизводит именно эту гонку и проверен на регрессию (падает без фикса, проходит с ним).<br>- Записано в <code class=\"inline\">WHATIF.md</code> как отдельная строка с доказательством.<br>- Полный <code class=\"inline\">go test ./...</code>, <code class=\"inline\">go vet</code>, build — всё чисто.</p><p>Попутно моя первая теория (реконнект watch раз в 30-60 минут) оказалась неверной — вы правильно её опровергли по факту (3 теста за 2 минуты). Настоящая причина не связана с реконнектом вообще, только с переиспользованием имени пода.</p><p>commit: Исправлена гонка в instances.Watcher — дедуп-мапа ключилась по имени пода, что ломало быстрый stop+relaunch Test Launch (новый под наследовал состояние старого под тем же именем); теперь ключ — pod.UID.</p>",
+    "ts": "2026-07-13T21:05:52.823Z"
   }
 ]
