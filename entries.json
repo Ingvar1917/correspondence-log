@@ -22655,5 +22655,53 @@
     "who": "claude",
     "html": "<p>Готово. Итог по этой цепочке диагностики:</p><p>- **Найдена и исправлена** реальная гонка в <code class=\"inline\">instances.Watcher</code>: dedup-мапа <code class=\"inline\">recorded</code> была ключом <code class=\"inline\">pod.Name</code>, что верно для Fleet-подов, но не для Test Launch (детерминированное имя <code class=\"inline\">test-&lt;gameID&gt;</code>, переиспользуется при быстром stop+relaunch). Новый под под тем же именем мог унаследовать чужое <code class=\"inline\">running/confirmedRunning</code> состояние от старого и молча пропустить свою собственную запись — <code class=\"inline\">container_started_at</code> оставался <code class=\"inline\">NULL</code> навсегда, хотя контейнер реально работал.<br>- Фикс: ключ мапы сменён на <code class=\"inline\">pod.UID</code> — новый физический под всегда стартует с чистого состояния, вне зависимости от переиспользованного имени.<br>- Тест <code class=\"inline\">TestWatcher_ReusedPodNameDoesNotInheritStalePriorPodState</code> — воспроизводит именно эту гонку и проверен на регрессию (падает без фикса, проходит с ним).<br>- Записано в <code class=\"inline\">WHATIF.md</code> как отдельная строка с доказательством.<br>- Полный <code class=\"inline\">go test ./...</code>, <code class=\"inline\">go vet</code>, build — всё чисто.</p><p>Попутно моя первая теория (реконнект watch раз в 30-60 минут) оказалась неверной — вы правильно её опровергли по факту (3 теста за 2 минуты). Настоящая причина не связана с реконнектом вообще, только с переиспользованием имени пода.</p><p>commit: Исправлена гонка в instances.Watcher — дедуп-мапа ключилась по имени пода, что ломало быстрый stop+relaunch Test Launch (новый под наследовал состояние старого под тем же именем); теперь ключ — pod.UID.</p>",
     "ts": "2026-07-13T21:05:52.823Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>2026/07/13 23:08:41 [sessionmanager] gameserver test-fce98936-4f0b-4ab0-bf02-60a34ec8ea48: fleet label &quot;&quot; is not a game id: invalid UUID length: 0<br>2026/07/13 23:08:50 [sessionmanager] gameserver test-fce98936-4f0b-4ab0-bf02-60a34ec8ea48: fleet label &quot;&quot; is not a game id: invalid UUID length: 0<br>2026/07/13 23:08:56 [metrics] list pod resource usage (metrics-server not installed?): list pod metrics in default: the server could not find the requested resource (get pods.metrics.k8s.io)<br>2026/07/13 23:09:01 [sessionmanager] gameserver test-fce98936-4f0b-4ab0-bf02-60a34ec8ea48: fleet label &quot;&quot; is not a game id: invalid UUID length: 0</p><p>я создал тестовый инстанс, он появился, остановил его и удалил, запустил еще раз, появился, остановил но не удалял, запустил еще раз, не появился</p>",
+    "ts": "2026-07-13T21:10:01.592Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s write a regression test for this exact scenario before running the full suite.</p>",
+    "ts": "2026-07-13T21:12:37.440Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now adding the regression test right after <code class=\"inline\">TestRepository_UpsertRunningThenUpsertMetricsConvergeOnSameRow</code>.</p>",
+    "ts": "2026-07-13T21:12:54.349Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Let&#x27;s verify this test actually catches the regression (revert the fix temporarily).</p>",
+    "ts": "2026-07-13T21:13:25.341Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Restored, builds clean. Let me do a targeted revert of just the fix (not the whole file) to verify the test actually catches the regression.</p>",
+    "ts": "2026-07-13T21:13:38.481Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Confirmed: fails without the fix exactly as predicted. Restoring the fix.</p>",
+    "ts": "2026-07-13T21:13:56.505Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Fix restored and confirmed. Now the full sweep, plus a note about the separate <code class=\"inline\">sessionmanager</code> log spam.</p>",
+    "ts": "2026-07-13T21:14:15.245Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово — нашёл и исправил второй, более тонкий слой того же бага.</p><p>**Второй баг**: даже когда <code class=\"inline\">Watcher</code> теперь корректно видит новый под (спасибо вчерашнему UID-фиксу), строка в БД всё равно могла остаться помеченной как **завершённая**. <code class=\"inline\">(cluster_id, pod_name)</code> уникален, а <code class=\"inline\">UpsertRunning</code>&#x27;s <code class=\"inline\">ON CONFLICT DO UPDATE</code> трогал только «свои» колонки и не сбрасывал <code class=\"inline\">ended_at/category/reason/exit_code/log_tail</code>, оставшиеся от **старого**, другого физического пода под тем же именем. Живьём проверил в БД: у вашего инстанса <code class=\"inline\">container_started_at</code> (21:08:40) &lt; <code class=\"inline\">ended_at</code> (21:08:50) &lt; <code class=\"inline\">started_at</code> (21:08:59) — внутренне противоречивая строка, прямое доказательство.</p><p>Это и объясняет вашу последовательность: с удалением строки перед релончем — работало (чистый INSERT), без удаления — старые <code class=\"inline\">ended_at</code>/категория оставались висеть поверх реально работающего нового пода.</p><p>**Фикс**: <code class=\"inline\">UpsertRunning</code> теперь безусловно сбрасывает <code class=\"inline\">ended_at/category/reason/message/exit_code/log_tail</code> (это всегда безопасно — «running»-сработка по определению означает «сейчас не завершён»), а <code class=\"inline\">container_started_at</code> COALESCE-ится только если старая строка САМА ещё не была завершена. Тест <code class=\"inline\">TestRepository_UpsertRunningRevivesRowAfterPriorTermination</code> — падает без фикса, проходит с ним. Полный <code class=\"inline\">go test ./...</code>/<code class=\"inline\">vet</code>/build — зелёные.</p><p>Отдельно, не по этой части: в ваших логах <code class=\"inline\">[sessionmanager] fleet label &quot;&quot; is not a game id</code> — это другой, не связанный пробел (session-manager не умеет резолвить game id у standalone Test Launch GameServer&#x27;ов, у них нет <code class=\"inline\">agones.dev/fleet</code>-лейбла). Безвредно (просто шумит в логах), не чинил сейчас — отметил в WHATIF.md как открытое.</p><p>**Важно**: у вас сейчас крутится <code class=\"inline\">make dev-stack</code>, собранный ДО обоих сегодняшних фиксов — чтобы проверить живьём, нужно <code class=\"inline\">Ctrl+C</code> и <code class=\"inline\">make dev-stack</code> заново (пересоберёт бинарь).</p><p>commit: Второй слой того же бага с Test Launch — UpsertRunning теперь сбрасывает поля завершения при оживлении переиспользованного pod_name, иначе новый работающий инстанс мог выглядеть завершённым.</p>",
+    "ts": "2026-07-13T21:15:19.474Z"
   }
 ]
