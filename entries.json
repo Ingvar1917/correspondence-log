@@ -17489,5 +17489,29 @@
     "who": "claude",
     "html": "<p>Обновлю память — это ценный сигнал о приоритетах пользователя на пре-лонч этапе.</p>",
     "ts": "2026-07-13T01:08:01.593Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Готово — баг найден и исправлен:**</p><p>- **Миграция 000047** — расширяет CHECK на <code class=\"inline\">gameserver_instances.category</code>, добавляя <code class=\"inline\">&#x27;stopped&#x27;</code>.<br>- **<code class=\"inline\">instances.Watcher.handle</code>** — на <code class=\"inline\">Deleted</code>-событии теперь проверяет, был ли под замечен как <code class=\"inline\">running</code> и ещё не <code class=\"inline\">terminated</code>; если да — пишет <code class=\"inline\">UpsertTermination</code> с новой категорией <code class=\"inline\">CategoryStopped</code> (exit code/reason неизвестны, <code class=\"inline\">EndedAt</code> = момент обнаружения, best-effort лог-тейл). Раньше эта ветка просто чистила dedup-мапу и ничего не писала в БД — отсюда и «статусы не менялись».<br>- **<code class=\"inline\">dashboardapi</code>** — <code class=\"inline\">stopped</code> добавлен в <code class=\"inline\">validInstanceCategories</code> + текст ошибки.<br>- **Фронт** (<code class=\"inline\">MonitoringTab.tsx</code>) — новый фильтр и бейдж «Stopped» (тон <code class=\"inline\">info</code>, не <code class=\"inline\">neutral</code> — чтобы визуально не путать с честным <code class=\"inline\">normal_exit</code>), ключи в <code class=\"inline\">en.ts</code>.<br>- **Тесты**: 2 новых в <code class=\"inline\">watcher_test.go</code> (реальный сценарий Stop-до-Terminated → <code class=\"inline\">stopped</code>; и что уже завершённый инстанс не перезаписывается при Delete), 1 новый во фронте. Прогнал: <code class=\"inline\">go test ./...</code> (полный, не <code class=\"inline\">-short</code>), <code class=\"inline\">go vet</code>, <code class=\"inline\">tsc --noEmit</code>, <code class=\"inline\">npm test</code> (105/105) — всё зелёное.<br>- <code class=\"inline\">PROJECT_MAP.md</code> обновлён.</p><p>Не забыл: чтобы это реально заработало у тебя в dev-stack (как и с <code class=\"inline\">tariff_id</code> ранее), нужен пересборка+рестарт <code class=\"inline\">bin/coordinator</code> — текущий запущенный процесс всё ещё старый. Пересобрать и перезапустить сейчас, чтобы проверить живьём?</p>",
+    "ts": "2026-07-13T01:08:38.284Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>после остановки игры инстансы просто пропали из monitoring вкладки</p>",
+    "ts": "2026-07-13T01:11:58.285Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нашёл — это отдельный, более старый баг, никак не связанный с тем, что чинили только что.</p>",
+    "ts": "2026-07-13T01:14:22.111Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Что нашёл:** 40 из 51 строк в <code class=\"inline\">gameserver_instances</code> имеют <code class=\"inline\">game_id = NULL</code> — они реально есть в базе (с правильными <code class=\"inline\">category</code>/<code class=\"inline\">ended_at</code>, я это проверил), но <code class=\"inline\">GET /games/{id}/instances</code> фильтрует строго <code class=\"inline\">WHERE game_id = $1</code>, так что строки без <code class=\"inline\">game_id</code> не покажутся **никогда, ни для одной игры**. Отсюда «инстансы просто пропали» — они не удалились, они стали невидимыми.</p><p>**Причина** — в <code class=\"inline\">internal/coordinator/instances/watcher.go</code>, в <code class=\"inline\">resolveGameID</code>: <code class=\"inline\">game_id</code> резолвится через **живой** вызов <code class=\"inline\">w.pods.GetGameServer(...)</code>, читающий лейбл <code class=\"inline\">agones.dev/fleet</code> с объекта GameServer (сам под этот лейбл не несёт — см. грабли в CLAUDE.md: «Лейбл <code class=\"inline\">agones.dev/fleet=&lt;имя&gt;</code> висит на объекте GameServer, не на самом Pod&#x27;е»). Это гонка: пока <code class=\"inline\">Watcher</code> дошёл до этого вызова после события пода, GameServer уже мог быть удалён (быстрый цикл launch→stop, как мы гоняли при тестах) — тогда лукап падает, <code class=\"inline\">game_id</code> остаётся <code class=\"inline\">nil</code> навсегда для этой строки. Старые 11 строк (первый долгий запуск) успели резолвиться; 40 новых (быстрые повторные launch/stop при проверке сегодняшнего фикса) — нет.</p><p>**Важно:** это не регрессия от того, что мы сегодня чинили — тот же самый живой лукап используется и в основной (не-Deleted) ветке <code class=\"inline\">handle</code>, баг существовал и раньше, просто редко проявлялся, пока не начали быстро гонять launch/stop туда-сюда.</p><p>**Предлагаемый фикс:** резолвить <code class=\"inline\">game_id</code> не живым k8s-вызовом, а детерминированно — так же, как уже сделано для standalone Test Launch инстансов (<code class=\"inline\">&quot;test-&quot;+gameID</code>, <code class=\"inline\">resolveGameID</code>&#x27;s второй case): под, принадлежащий Fleet&#x27;у, всегда называется <code class=\"inline\">&lt;fleetName&gt;-&lt;hash&gt;-&lt;random&gt;</code>, а <code class=\"inline\">Fleet.Name</code> — это сам <code class=\"inline\">game_id</code> (тот же факт уже используется в <code class=\"inline\">metrics.Collector.collectOnce</code>: «Fleet.Name is the game id itself... no separate label lookup needed»). Первые 36 символов имени пода (каноническая длина UUID) — и есть <code class=\"inline\">game_id</code>, без единого k8s-вызова и без гонки вообще. Данные это подтверждают: <code class=\"inline\">fce98936-4f0b-4ab0-bf02-60a34ec8ea48-mpbjp-h4vcr</code> — префикс ровно совпадает с <code class=\"inline\">game_id</code> этой игры.</p><p>Делать так?</p>",
+    "ts": "2026-07-13T01:14:45.156Z"
   }
 ]
