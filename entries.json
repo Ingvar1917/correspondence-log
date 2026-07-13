@@ -22265,5 +22265,197 @@
     "who": "ihar",
     "html": "<p>&lt;task-notification&gt;<br>&lt;task-id&gt;b0ik2hsl6&lt;/task-id&gt;<br>&lt;tool-use-id&gt;toolu_014MvkczthxvzZ2AvM5ea1qz&lt;/tool-use-id&gt;<br>&lt;output-file&gt;/tmp/claude-1000/-home-ihar-Games-ludarium-coordinator/ccac3002-8530-4477-84c1-21e86f915dba/tasks/b0ik2hsl6.output&lt;/output-file&gt;<br>&lt;status&gt;completed&lt;/status&gt;<br>&lt;summary&gt;Background command &quot;make test-e2e-launcher 2&amp;gt;&amp;amp;1 | tail -20&quot; completed (exit code 0)&lt;/summary&gt;<br>&lt;/task-notification&gt;</p>",
     "ts": "2026-07-13T19:55:16.966Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Живая проверка на настоящем Agones подтвердила гарантию, на которую опирается фича:</p><p>- <code class=\"inline\">TestE2E_RolloutActiveBuildUpdatesReadyButSparesAllocated</code> — Ready-под, ещё не занятый матчем, реально получает новый шаблон (env var сменился v1→v2); Allocated-под (симулированный живой матч через <code class=\"inline\">client.Allocate</code>) остаётся живым и на старом шаблоне, не сносится.<br>- Оба live e2e-теста (<code class=\"inline\">TestE2E_LaunchAppliesInstanceSizeToRealPod</code>, новый) прошли вместе.<br>- Полный <code class=\"inline\">go build</code>/<code class=\"inline\">go vet</code> без тега e2e — чисто, фикс тестового фикстура не задевает обычную сборку.</p><p>Причина первого фейла — тестовый баг (общий хелпер <code class=\"inline\">newLauncher()</code> тянул фейковый недостижимый <code class=\"inline\">bridge-sidecar</code> образ, живой кластер честно пытался его пуллить и вис), не в логике <code class=\"inline\">RolloutActiveBuild</code>/<code class=\"inline\">UpdateFleetTemplate</code>. Поправил только новый e2e-тест — дал ему свой <code class=\"inline\">launcher.New(...)</code> с реальным <code class=\"inline\">bridge-sidecar:e2e</code>.</p><p>Фича полностью реализована и проверена: юнит-тесты (agones/launcher/dashboardapi), UI, и теперь живой прогон против настоящего Agones.</p><p>commit: Активация билда теперь сразу раскатывает новый образ/команду на уже запущенные регионы через rolling update Fleet&#x27;а (закрывает risk №8), с живой e2e-проверкой, что Allocated-инстансы не трогаются.</p>",
+    "ts": "2026-07-13T19:55:40.482Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>в dashboardui в инстансы добавить название билда заданное индюком, сделать что бы live логи не скролились вниз при обновлении контента</p>",
+    "ts": "2026-07-13T19:56:00.542Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Next migration is 000051. Let me set up the todo list and start.</p>",
+    "ts": "2026-07-13T19:59:04.476Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now update <code class=\"inline\">buildGameServerSpec</code> to set the annotation:</p>",
+    "ts": "2026-07-13T19:59:24.957Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s add a unit test for the annotation, then move to the launcher layer.</p>",
+    "ts": "2026-07-13T19:59:46.709Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now add a dedicated test for the annotation right after this function.</p>",
+    "ts": "2026-07-13T19:59:57.318Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Agones layer done. Now the launcher layer.</p>",
+    "ts": "2026-07-13T20:00:59.636Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now <code class=\"inline\">testinstance.go</code>&#x27;s TestLaunch path:</p>",
+    "ts": "2026-07-13T20:01:23.950Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Compiles clean. Now the migration + instances package (watcher + repository).</p>",
+    "ts": "2026-07-13T20:01:52.212Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s look at <code class=\"inline\">instance.go</code>, <code class=\"inline\">repository.go</code> (RunningParams / UpsertRunning / columns) and <code class=\"inline\">watcher.go</code>&#x27;s handling of <code class=\"inline\">RunningParams</code>.</p>",
+    "ts": "2026-07-13T20:02:15.746Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Expected — adding the field now.</p>",
+    "ts": "2026-07-13T20:02:48.640Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now update <code class=\"inline\">RunningParams</code> and <code class=\"inline\">UpsertRunning</code> SQL.</p>",
+    "ts": "2026-07-13T20:03:01.346Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now update <code class=\"inline\">watcher.go</code> to read the annotation and pass it through.</p>",
+    "ts": "2026-07-13T20:03:29.609Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s add the <code class=\"inline\">buildLabel</code> helper near <code class=\"inline\">runningStartedAt</code>.</p>",
+    "ts": "2026-07-13T20:03:45.736Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Compiles. Now let&#x27;s run the instances package tests to check for anything relying on column order/count.</p>",
+    "ts": "2026-07-13T20:04:04.007Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Passes. Now let&#x27;s add dedicated tests for the build label capture, then move to dashboardapi.</p>",
+    "ts": "2026-07-13T20:04:21.420Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Already imports <code class=\"inline\">agones</code>. Adding the test after the ContainerStartedAt tests.</p>",
+    "ts": "2026-07-13T20:04:35.545Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Both pass. Now the dashboardapi exposure.</p>",
+    "ts": "2026-07-13T20:05:01.911Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Let me add <code class=\"inline\">BuildLabel</code> to this struct and a test verifying it&#x27;s plumbed through.</p>",
+    "ts": "2026-07-13T20:06:29.211Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Backend done. Now frontend: types, MonitoringTab display, and the LogDrawer autoscroll fix.</p>",
+    "ts": "2026-07-13T20:06:58.292Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s add the badge in the instance row, right next to the region badge.</p>",
+    "ts": "2026-07-13T20:07:27.888Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Good, <code class=\"inline\">label: string</code> fits. Now let&#x27;s check tsc + tests.</p>",
+    "ts": "2026-07-13T20:07:40.791Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Clean. Now let&#x27;s add a MonitoringTab test for the build label badge and fix the LogDrawer autoscroll.</p>",
+    "ts": "2026-07-13T20:07:48.971Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Let&#x27;s look at the <code class=\"inline\">match_started</code> test (line 316) as a template for adding a <code class=\"inline\">build_label</code> test right after it.</p>",
+    "ts": "2026-07-13T20:08:05.369Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All pass. Now the LogDrawer autoscroll fix.</p>",
+    "ts": "2026-07-13T20:08:44.128Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now attach the <code class=\"inline\">onScroll</code> handler to the <code class=\"inline\">&lt;pre&gt;</code> element:</p>",
+    "ts": "2026-07-13T20:09:07.423Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Clean. Let&#x27;s add a small regression test proving the sticky-scroll behavior itself (not just that nothing broke), then run the full suite.</p>",
+    "ts": "2026-07-13T20:09:37.221Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>No dedicated test file exists — the component is only tested indirectly via <code class=\"inline\">OverviewTab.test.tsx</code>. Let me create a focused one for the sticky-scroll behavior, mocking scroll geometry since jsdom doesn&#x27;t compute real layout.</p>",
+    "ts": "2026-07-13T20:09:46.632Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Both pass. Now the final full test suite run.</p>",
+    "ts": "2026-07-13T20:10:12.243Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p><code class=\"inline\">db</code> package test (which exercises real migrations against Postgres) passed — confirms the new migration is valid. Now the full frontend suite.</p>",
+    "ts": "2026-07-13T20:11:03.809Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All 109 UI tests pass, <code class=\"inline\">tsc --noEmit</code> clean.</p>",
+    "ts": "2026-07-13T20:11:16.446Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово, обе задачи сделаны и покрыты тестами.</p><p>**Название билда в инстансах:**<br>- Билд-лейбл (<code class=\"inline\">builds.Build.Label</code>) теперь печётся в Pod как **аннотация** <code class=\"inline\">coordinator.dev/build-label</code>, а не k8s-лейбл — важный нюанс: индюк вводит произвольный текст (пробелы, эмодзи), а k8s-лейблы ограничены строгим regex/63 символами, с лейблом <code class=\"inline\">CreateFleet</code> падал бы на валидации. Подтвердил чтением исходников Agones — кастомные аннотации на Pod-шаблоне доживают до реального Pod&#x27;а без изменений.<br>- <code class=\"inline\">instances.Watcher</code> читает эту аннотацию при первой же встрече пода, кладёт в новую колонку <code class=\"inline\">gameserver_instances.build_label</code> (миграция 000051).<br>- Прокинуто через весь путь: <code class=\"inline\">agones.FleetSpec</code> → <code class=\"inline\">launcher.resolveLaunchSource</code>/<code class=\"inline\">testinstance.go</code> → <code class=\"inline\">dashboardapi.instanceView</code> → <code class=\"inline\">Instance.build_label</code> на фронте → бейдж рядом с регионом в Monitoring → Инстансы.<br>- Работает и для Test Launch, и для обычного Fleet-пути; для BYO-Docker игр (нет билда) — просто не показывается.</p><p>**Автоскролл логов:**<br>- В <code class=\"inline\">LogDrawer.tsx</code> живой tail раньше безусловно дёргал <code class=\"inline\">scrollTop</code> на каждую новую строку. Теперь — «прилипание ко низу»: если читатель уже был внизу, новые строки продолжают уводить вид вниз; если он проскроллил вверх читать историю — новые строки больше не выдёргивают его обратно.</p><p>Прогнан полный <code class=\"inline\">go test ./...</code> (включая живой прогон миграций через пакет <code class=\"inline\">db</code>), <code class=\"inline\">tsc --noEmit</code> и весь vitest (109/109) — всё зелёное.</p><p>commit: Добавлена индюком заданное имя билда к каждому инстансу (через Pod-аннотацию, не k8s-лейбл — билды могут содержать любые символы), и живой tail логов больше не сбрасывает скролл читателя вниз при новых строках.</p>",
+    "ts": "2026-07-13T20:11:35.405Z"
   }
 ]
