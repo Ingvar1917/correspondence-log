@@ -19031,5 +19031,11 @@
     "who": "claude",
     "html": "<p>Всё готово. Все 6 пунктов плана метрик самого координатора реализованы и закрыты в <code class=\"inline\">PROJECT_MAP.md</code>:</p><p>1. **Здоровье процесса** — Grafana-панель на уже существующие <code class=\"inline\">go_*</code>/<code class=\"inline\">process_*</code> (ноль кода).<br>2. **Здоровье фоновых циклов** — новый пакет <code class=\"inline\">internal/coordinator/loopstats</code>, подключён к <code class=\"inline\">metrics.Collector</code>, <code class=\"inline\">provisioning.Manager</code> и <code class=\"inline\">main.runForever</code> (общий для тиковых и watch-based циклов).<br>3. **Застрявшие provisioning-задачи** — гейдж <code class=\"inline\">coordinator_provisioning_stuck_jobs</code> в <code class=\"inline\">Manager.tick</code>.<br>4. **Пул Postgres** — <code class=\"inline\">cmd/coordinator/dbstats.go</code>, свой тикер поверх <code class=\"inline\">sql.DB.Stats()</code>.<br>5. **HTTP RED-метрики** — <code class=\"inline\">cmd/coordinator/httpmetrics.go</code>, лейбл <code class=\"inline\">route</code> через <code class=\"inline\">r.Pattern</code> (Go 1.22 mux), с найденной и протестированной ловушкой порядка обёртки вокруг <code class=\"inline\">http.StripPrefix</code>.<br>6. **Внешние API** — <code class=\"inline\">cmd/coordinator/externalmetrics.go</code>: штатный хук <code class=\"inline\">client-go/tools/metrics</code> для Agones/k8s REST + общий <code class=\"inline\">http.RoundTripper</code> для DO/Vultr/OVH (три разных, проверенных по исходникам способа воткнуть транспорт).</p><p>Все изменения покрыты тестами, <code class=\"inline\">go build</code>/<code class=\"inline\">go vet</code>/<code class=\"inline\">go test ./...</code> (полный, с testcontainers) проходят чисто. Дашборд <code class=\"inline\">coordinator-process.json</code> собирает все новые метрики в одном месте.</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
     "ts": "2026-07-13T16:19:47.410Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>метрика записи на диск нужна для координатора?</p>",
+    "ts": "2026-07-13T16:20:10.159Z"
   }
 ]
