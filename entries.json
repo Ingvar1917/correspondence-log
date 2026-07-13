@@ -22817,5 +22817,41 @@
     "who": "claude",
     "html": "<p>Готово. История Test Launch теперь сохраняется через реланч.</p><p>**Финальный дизайн**: <code class=\"inline\">UNIQUE(cluster_id, pod_name)</code> заменён на **partial unique index** (<code class=\"inline\">WHERE ended_at IS NULL</code>, миграция 000052). Живой инстанс по-прежнему один на (cluster_id, pod_name) — Watcher/Collector сходятся на одну строку, как и раньше. Завершённая строка выпадает из индекса — реланч под тем же именем просто вставляет новую строку, старая остаётся историей. Фронту менять ничего не пришлось.</p><p>По ходу поймал реальную граблю (доказано прямым прогоном в Postgres, не по документации): partial-index arbiter в <code class=\"inline\">ON CONFLICT ... WHERE predicate</code> засчитывает конфликт, только если **вставляемая строка сама удовлетворяет предикату**. Для <code class=\"inline\">UpsertTermination</code> это никогда не так (<code class=\"inline\">ended_at</code> всегда проставлен) — первая версия молча создавала фантомную строку на **каждое** завершение, включая обычный случай, оставляя живую строку висеть вечно. Переписал <code class=\"inline\">UpsertTermination</code> без <code class=\"inline\">ON CONFLICT</code> — явный <code class=\"inline\">UPDATE ... WHERE ended_at IS NULL</code>, и только если 0 строк обновилось — <code class=\"inline\">INSERT</code>.</p><p>Тесты: <code class=\"inline\">TestRepository_UpsertRunningAfterPriorTerminationPreservesHistoryAsNewRow</code>, <code class=\"inline\">TestWatcher_StopThenRelaunchUnderSameNamePreservesHistory</code>, обновлённые старые тесты (теперь ожидают 2 строки после реюза имени, не 1) — все проходят. Полный <code class=\"inline\">go test ./...</code> (включая живой прогон миграций в пакете <code class=\"inline\">db</code>) зелёный.</p><p>**Не забудьте**: <code class=\"inline\">make dev-stack</code> всё ещё крутит бинарь, собранный до всех сегодняшних правок — пересоберите (<code class=\"inline\">Ctrl+C</code> → <code class=\"inline\">make dev-stack</code>), чтобы проверить живьём.</p><p>commit: Test Launch теперь сохраняет историю прошлых запусков вместо перезаписи одной строки — UNIQUE(cluster_id,pod_name) заменён на partial unique index по живым инстансам, UpsertTermination переписан без ON CONFLICT (partial-index arbiter не ловит конфликт, если вставляемая строка сама не под предикатом).</p>",
     "ts": "2026-07-13T21:35:01.953Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>2026/07/13 23:35:34 [sessionmanager] gameserver test-fce98936-4f0b-4ab0-bf02-60a34ec8ea48: fleet label &quot;&quot; is not a game id: invalid UUID length: 0<br>это можно исправить?</p>",
+    "ts": "2026-07-13T21:36:01.580Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s check the build and existing sessionmanager tests, then add a regression test for this specific case.</p>",
+    "ts": "2026-07-13T21:36:36.779Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Full package + full suite check.</p>",
+    "ts": "2026-07-13T21:37:42.667Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Let&#x27;s update the WHATIF.md note from earlier (marked ⬜) since this is now fixed.</p>",
+    "ts": "2026-07-13T21:37:56.402Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полный прогон для финальной проверки.</p>",
+    "ts": "2026-07-13T21:38:14.966Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Исправлено: <code class=\"inline\">sessionmanager.Manager.handle</code> теперь тихо пропускает standalone GameServer&#x27;ы (нет <code class=\"inline\">agones.dev/fleet</code>-лейбла — Test Launch, не Fleet) вместо логирования ошибки на каждую сработку в <code class=\"inline\">Ready</code>. Настоящий сломанный/непустой лейбл по-прежнему логируется. Тест <code class=\"inline\">TestManager_ReadyEvent_StandaloneGameServerIsSkippedSilently</code> подтверждает.</p><p>commit: session-manager больше не спамит &quot;fleet label is not a game id&quot; для standalone Test Launch инстансов — тихо пропускает их вместо DrainQueue, которого у них и не может быть.</p>",
+    "ts": "2026-07-13T21:38:25.959Z"
   }
 ]
