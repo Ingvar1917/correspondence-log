@@ -17975,5 +17975,17 @@
     "who": "claude",
     "html": "<p><code class=\"inline\">TestLaunch_PersistsJobBeforeCreatingCluster</code> — это прямое доказательство порядка операций, не проверка конечного состояния. Механика:</p>",
     "ts": "2026-07-13T10:33:10.091Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Идея теста:** обычно тест на «X случилось раньше Y» пришлось бы проверять косвенно (по итоговому состоянию после всего). Тут — прямая ловушка прямо в момент вызова:</p><p>1. Фейковый <code class=\"inline\">CloudProvisioner.CreateCluster</code> — не просто возвращает результат, а сначала (внутри себя, ДО <code class=\"inline\">return</code>) дёргает <code class=\"inline\">createHook</code> — колбэк, который тест сам подложил.<br>2. Этот колбэк изнутри <code class=\"inline\">CreateCluster</code> читает **настоящую** БД через <code class=\"inline\">jobsRepo.ListAll(...)</code> — ту же, что использует и сам <code class=\"inline\">Manager</code>. То есть тест смотрит на состояние базы ровно в тот момент, когда реальный код &quot;разговаривает с облаком&quot;, а не после того, как всё уже закончилось.<br>3. Условие в колбэке: есть ли уже строка <code class=\"inline\">Job</code> с <code class=\"inline\">cloud=&quot;do&quot;</code>, <code class=\"inline\">region=&quot;fra1&quot;</code>, <code class=\"inline\">status=provisioning</code>, <code class=\"inline\">external_cluster_id=&quot;&quot;</code> — именно то состояние, которое должно существовать, если запись в БД действительно произошла **до** вызова облака.<br>4. <code class=\"inline\">sawJob</code> — просто флаг &quot;да, увидел&quot;.</p><p>**Что доказывает:** если бы код всё ещё был в старом (багованном) порядке — сначала <code class=\"inline\">CreateCluster</code>, потом <code class=\"inline\">m.jobs.Create</code> — то в момент, когда выполняется <code class=\"inline\">createHook</code> (то есть мы всё ещё внутри <code class=\"inline\">CreateCluster</code>, <code class=\"inline\">Create</code> для job ещё не вызывался), в БД строки не было бы вообще → <code class=\"inline\">sawJob</code> остался бы <code class=\"inline\">false</code> → тест бы упал с <code class=\"inline\">&quot;no provisioning job existed at the moment CreateCluster was called&quot;</code>.</p><p>То есть это не тест «после Launch job существует» (это тривиально и не отличает старый порядок от нового) — это тест **буквально «в момент когда мы говорим с облаком, БД уже знает о попытке»**, что и есть гарантия против сценария <code class=\"inline\">coordinator-asia</code> (crash ровно в этом окне).</p><p>Второй, более простой тест (<code class=\"inline\">TestLaunch_PropagatesCreateClusterError</code>) добавляет ещё один угол: если <code class=\"inline\">CreateCluster</code> вообще упал с ошибкой — job всё равно должен остаться в БД (со статусом <code class=\"inline\">failed</code>), а не исчезнуть, как было раньше (когда job создавался только после успеха облака, и при ошибке строки не появлялось вовсе).</p>",
+    "ts": "2026-07-13T10:33:28.167Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>почему после make dev-down контейнеры координатора все еще живы?</p>",
+    "ts": "2026-07-13T10:35:42.709Z"
   }
 ]
