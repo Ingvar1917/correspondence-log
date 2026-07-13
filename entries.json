@@ -18719,5 +18719,317 @@
     "who": "ihar",
     "html": "<p>сперва составим план по каждому пункту</p>",
     "ts": "2026-07-13T15:40:08.504Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Разложу план по каждому пункту — что именно делать, каким механизмом и с какой сложностью, чтобы дальше решить порядок и объём.</p><p>**1. Здоровье процесса** — план тривиален: код уже есть (client_golang регистрирует <code class=\"inline\">go_collector</code>/<code class=\"inline\">process_collector</code> в <code class=\"inline\">DefaultRegisterer</code> автоматически, <code class=\"inline\">promhttp.Handler()</code> их уже отдаёт). Нужна только Grafana-панель (<code class=\"inline\">go_goroutines</code>, <code class=\"inline\">go_gc_duration_seconds</code>, <code class=\"inline\">process_resident_memory_bytes</code>, <code class=\"inline\">process_cpu_seconds_total</code>). Ноль изменений в Go-коде.</p><p>**2. HTTP RED-метрики (dashboard/admin API)** — обернуть регистрацию хендлеров в <code class=\"inline\">wiring.go</code> middleware&#x27;ом (<code class=\"inline\">promhttp.InstrumentHandlerDuration</code>/<code class=\"inline\">InstrumentHandlerCounter</code> или свой): счётчик запросов + гистограмма длительности, лейблы <code class=\"inline\">route</code> (шаблон пути, не сырой — иначе <code class=\"inline\">game_id</code> в URL взорвёт кардинальность) + <code class=\"inline\">method</code> + <code class=\"inline\">status</code>. Важно навешивать метрику в момент регистрации маршрута (там уже известен шаблон), а не пытаться вытаскивать паттерн из <code class=\"inline\">net/http.ServeMux</code> постфактум.</p><p>**3. Здоровье фоновых циклов** (<code class=\"inline\">metrics.Collector.Run</code>, <code class=\"inline\">instances.Watcher</code>, <code class=\"inline\">provisioning.Manager.Run</code>) — три потребителя одной и той же формы (длительность последнего тика + счётчик ошибок подряд), это ровно тот случай, когда общий хелпер оправдан (правило &quot;выносим на третьем потребителе&quot; уже есть в конвенциях, тут тот же принцип). План: небольшой общий тип в <code class=\"inline\">metrics</code>-пакете, например <code class=\"inline\">LoopInstrumentation{Name string}</code> с методом <code class=\"inline\">Observe(duration, err)</code>, регистрирующий гейдж <code class=\"inline\">coordinator_loop_last_tick_seconds{loop=...}</code> и counter <code class=\"inline\">coordinator_loop_errors_total{loop=...}</code>; каждый из трёх циклов вызывает его в конце своего тика.</p><p>**4. Пул Postgres** — <code class=\"inline\">sql.DB.Stats()</code> не пушится сам, нужен свой маленький тикер (например раз в 15с), читающий <code class=\"inline\">Stats()</code> и выставляющий гейджи <code class=\"inline\">open_connections</code>/<code class=\"inline\">idle</code>/<code class=\"inline\">in_use</code>/<code class=\"inline\">wait_count</code>/<code class=\"inline\">wait_duration</code>. Понадобится доступ к <code class=\"inline\">*sql.DB</code> там, где уже собираются остальные метрики (проверить, прокинут ли он в <code class=\"inline\">wiring.go</code> в нужное место — скорее всего да, раз миграции и репозитории все идут через один <code class=\"inline\">*sql.DB</code>).</p><p>**5. Внешние API (Agones REST, cloud-провайдеры)** — тут два разных механизма:<br>   - Agones/k8s REST-клиент: у <code class=\"inline\">client-go</code> уже есть штатный хук <code class=\"inline\">k8s.io/client-go/tools/metrics</code> — регистрируется один раз, не нужно оборачивать каждый вызов вручную. Нужно проверить (не проверено), реально ли <code class=\"inline\">agonesv1</code>/dynamic-клиент через него идёт.<br>   - DO/Vultr/OVH-адаптеры — самописные HTTP-клиенты, тут <code class=\"inline\">tools/metrics</code>-хука нет. Если все три используют <code class=\"inline\">*http.Client</code>, можно подсунуть один <code class=\"inline\">http.RoundTripper</code>-обёртку (латency+статус по хосту) — одна точка на все три облака сразу, не три раза копипастить.</p><p>**6. Согласованность состояния** — тут план разбивается на дешёвую и дорогую часть:<br>   - Дешёвая: гейдж &quot;задач в <code class=\"inline\">provisioning</code> дольше N минут&quot; — считается прямо в существующем <code class=\"inline\">Manager.tick</code>, данные уже есть (<code class=\"inline\">ListActive</code>), почти бесплатно.<br>   - Дорогая: расхождение <code class=\"inline\">game_regions</code> vs реальных Fleet&#x27;ов в кластере — это не метрика, а полноценная сверка (нужно листить живые Fleet&#x27;ы и сравнивать с БД), то есть отдельная reconciliation-задача, которую мы уже как открытый риск фиксировали ранее (orphan-кластер). Предлагаю не смешивать её с этим планом метрик — обозначить отдельным пунктом на будущее.</p><p>Порядок по цене/пользе получается: 1 (бесплатно) → 3 (самое дырявое место, дёшево) → 6-дешёвая часть → 4 → 2 → 5 → 6-дорогая часть отдельной задачей.</p><p>Согласен с таким разбиением и порядком? Если да — зафиксирую как план в <code class=\"inline\">PROJECT_MAP.md</code> и заведу задачи по пунктам перед началом работы.</p>",
+    "ts": "2026-07-13T15:41:02.608Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>да</p>",
+    "ts": "2026-07-13T15:41:14.614Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю новый подраздел плана сразу после этого блока про метрики игр.</p>",
+    "ts": "2026-07-13T15:41:26.500Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, любой JSON в этой папке подхватится автоматически. Создам отдельный дашборд для процесса координатора (не привязан к game/account фильтрам, это другой уровень).</p>",
+    "ts": "2026-07-13T15:42:38.241Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>job здесь называется <code class=\"inline\">coordinator-dev-up</code>/<code class=\"inline\">coordinator-dev-stack</code>, а не <code class=\"inline\">coordinator</code> — поправлю запросы под оба варианта разом.</p>",
+    "ts": "2026-07-13T15:42:54.564Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю, что JSON валидный, и первый пункт плана закрыт.</p>",
+    "ts": "2026-07-13T15:47:54.088Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Пункт 1 закрыт — дашборд <code class=\"inline\">coordinator-process.json</code> (goroutines, RSS, CPU, GC pause, FD) готов без единой строчки Go-кода.</p>",
+    "ts": "2026-07-13T15:47:58.786Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь подключу к <code class=\"inline\">metrics.Collector</code> — изменю <code class=\"inline\">collectOnce</code> на возврат ошибки и добавлю инструментацию в <code class=\"inline\">Run</code>.</p>",
+    "ts": "2026-07-13T15:50:47.351Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Expected, продолжаю — сейчас добавлю поле и использование.</p>",
+    "ts": "2026-07-13T15:50:58.523Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нужно добавить <code class=\"inline\">return nil</code> в конце функции.</p>",
+    "ts": "2026-07-13T15:51:19.913Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю doc-комментарий над <code class=\"inline\">collectOnce</code>, раз теперь возвращаются обе ошибки.</p>",
+    "ts": "2026-07-13T15:51:31.689Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю конструирование <code class=\"inline\">loopStats</code> рядом с экспортёрами.</p>",
+    "ts": "2026-07-13T15:51:45.212Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю импорт и подключу <code class=\"inline\">loopStats</code> к остальным местам (provisioning.Manager, metrics.Collector, runForever).</p>",
+    "ts": "2026-07-13T15:51:52.681Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">provisioning.NewManager</code>:</p>",
+    "ts": "2026-07-13T15:52:03.026Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — сейчас обновлю <code class=\"inline\">provisioning.Manager</code> (конструктор, поле, <code class=\"inline\">tick</code>).</p>",
+    "ts": "2026-07-13T15:52:09.988Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь массово вставлю <code class=\"inline\">testLoopStats()</code> перед <code class=\"inline\">provisioning.Config{</code> во всех вызовах <code class=\"inline\">NewManager</code> в этом файле.</p>",
+    "ts": "2026-07-13T15:52:51.358Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Нужно добавить поле <code class=\"inline\">loopStats</code> в <code class=\"inline\">services</code> и сохранить его при построении.</p>",
+    "ts": "2026-07-13T15:53:56.486Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновлю вызов <code class=\"inline\">metrics.New</code> и <code class=\"inline\">runForever</code> на использование <code class=\"inline\">s.loopStats</code>.</p>",
+    "ts": "2026-07-13T15:54:08.875Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновлю оба call-сайта <code class=\"inline\">runForever</code>.</p>",
+    "ts": "2026-07-13T15:54:28.302Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Есть тестовый файл <code class=\"inline\">runforever_test.go</code> — надо обновить оба вызова там.</p>",
+    "ts": "2026-07-13T15:54:47.377Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Только <code class=\"inline\">collector_test.go</code> (13 сайтов, все package-internal <code class=\"inline\">New(</code>, не <code class=\"inline\">metrics.New</code>). Проверю импорты и добавлю хелпер + вставлю параметр.</p>",
+    "ts": "2026-07-13T15:55:14.019Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хороший образец для копирования — добавлю <code class=\"inline\">testLoopStats</code> рядом с <code class=\"inline\">testExporter</code>.</p>",
+    "ts": "2026-07-13T15:55:18.305Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь массово вставлю <code class=\"inline\">testLoopStats(t)</code> во все 13 вызовов <code class=\"inline\">metrics.New(...)</code>.</p>",
+    "ts": "2026-07-13T15:55:25.368Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All 13 обновлены. Проверю, что весь модуль компилируется и тесты (short) проходят.</p>",
+    "ts": "2026-07-13T15:55:46.361Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь <code class=\"inline\">go vet</code> и unit-тесты admindashboard (fakeProvisioner там мог зависеть от старого интерфейса — проверю), плюс <code class=\"inline\">make test-short</code>.</p>",
+    "ts": "2026-07-13T15:55:55.591Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полный прогон (с testcontainers) для затронутых пакетов зелёный. Обновлю план в <code class=\"inline\">PROJECT_MAP.md</code>, отметив пункт 2 закрытым.</p>",
+    "ts": "2026-07-13T15:56:30.901Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавлю сам гейдж в <code class=\"inline\">Manager</code> и параметр реестра в конструктор.</p>",
+    "ts": "2026-07-13T15:57:46.375Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновлю <code class=\"inline\">tick</code>, чтобы считать застрявшие задачи.</p>",
+    "ts": "2026-07-13T15:58:02.352Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновлю вызов <code class=\"inline\">provisioning.NewManager</code> в <code class=\"inline\">wiring.go</code>.</p>",
+    "ts": "2026-07-13T15:58:26.944Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, все 16 обновлены (<code class=\"inline\">prometheus</code> уже импортирован в этом файле). Теперь e2e-файлы:</p>",
+    "ts": "2026-07-13T15:58:45.259Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, там своя fake-реализация интерфейса, не завязана на <code class=\"inline\">NewManager</code>. Проверю сборку/тесты целиком.</p>",
+    "ts": "2026-07-13T15:59:26.829Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется под обоими тегами. Прогоню тесты.</p>",
+    "ts": "2026-07-13T15:59:40.381Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба новых теста проходят. Прогоню весь пакет провижининга целиком и <code class=\"inline\">go vet</code>/сборку разом на всякий случай.</p>",
+    "ts": "2026-07-13T16:01:07.900Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю пункт 3 плана в <code class=\"inline\">PROJECT_MAP.md</code> и todo.</p>",
+    "ts": "2026-07-13T16:01:17.732Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавлю конфиг и запуск в <code class=\"inline\">run()</code>.</p>",
+    "ts": "2026-07-13T16:02:38.935Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь запущу <code class=\"inline\">runDBStats</code> из <code class=\"inline\">run()</code> в <code class=\"inline\">main.go</code>.</p>",
+    "ts": "2026-07-13T16:03:08.492Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку и добавлю небольшой тест на <code class=\"inline\">dbstats.go</code>.</p>",
+    "ts": "2026-07-13T16:03:22.558Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>gofmt ругается — поправлю форматирование.</p>",
+    "ts": "2026-07-13T16:03:55.821Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это преэкзистентная проблема (curly quote в комментарии), не моя правка — не трогаю. Проверю сборку/тесты целиком.</p>",
+    "ts": "2026-07-13T16:04:19.988Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю панели пула Postgres в тот же дашборд <code class=\"inline\">coordinator-process.json</code>.</p>",
+    "ts": "2026-07-13T16:04:33.580Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю <code class=\"inline\">PROJECT_MAP.md</code> (пункт 4 закрыт) и todo.</p>",
+    "ts": "2026-07-13T16:05:02.400Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь подключу в <code class=\"inline\">buildRootMux</code>.</p>",
+    "ts": "2026-07-13T16:07:19.719Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное (кроме уже известной преэкзистентной проблемы). Добавлю панель HTTP RED в дашборд и обновлю карту.</p>",
+    "ts": "2026-07-13T16:08:22.592Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Опечатка — уберу лишний символ.</p>",
+    "ts": "2026-07-13T16:09:04.475Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь подключу это в <code class=\"inline\">buildProvisioningClouds</code> и вызов регистрации k8s-хука в <code class=\"inline\">main.go</code>.</p>",
+    "ts": "2026-07-13T16:16:30.721Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь найду вызов <code class=\"inline\">buildProvisioningClouds</code> и обновлю сигнатуру + тела.</p>",
+    "ts": "2026-07-13T16:16:35.947Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо, сейчас обновлю саму функцию.</p>",
+    "ts": "2026-07-13T16:16:47.432Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавлю вызов <code class=\"inline\">registerK8sClientMetrics</code> в <code class=\"inline\">main.go</code> (один раз, до любых <code class=\"inline\">NewClientFromKubeconfig</code>).</p>",
+    "ts": "2026-07-13T16:17:13.459Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All tests pass. Проверю полную сборку/vet/тесты и gofmt.</p>",
+    "ts": "2026-07-13T16:18:04.231Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Обновлю пункт 6 в <code class=\"inline\">PROJECT_MAP.md</code> и дашборд, закрою план.</p>",
+    "ts": "2026-07-13T16:18:33.928Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю чек-лист (todo) финально.</p>",
+    "ts": "2026-07-13T16:19:06.492Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё готово. Все 6 пунктов плана метрик самого координатора реализованы и закрыты в <code class=\"inline\">PROJECT_MAP.md</code>:</p><p>1. **Здоровье процесса** — Grafana-панель на уже существующие <code class=\"inline\">go_*</code>/<code class=\"inline\">process_*</code> (ноль кода).<br>2. **Здоровье фоновых циклов** — новый пакет <code class=\"inline\">internal/coordinator/loopstats</code>, подключён к <code class=\"inline\">metrics.Collector</code>, <code class=\"inline\">provisioning.Manager</code> и <code class=\"inline\">main.runForever</code> (общий для тиковых и watch-based циклов).<br>3. **Застрявшие provisioning-задачи** — гейдж <code class=\"inline\">coordinator_provisioning_stuck_jobs</code> в <code class=\"inline\">Manager.tick</code>.<br>4. **Пул Postgres** — <code class=\"inline\">cmd/coordinator/dbstats.go</code>, свой тикер поверх <code class=\"inline\">sql.DB.Stats()</code>.<br>5. **HTTP RED-метрики** — <code class=\"inline\">cmd/coordinator/httpmetrics.go</code>, лейбл <code class=\"inline\">route</code> через <code class=\"inline\">r.Pattern</code> (Go 1.22 mux), с найденной и протестированной ловушкой порядка обёртки вокруг <code class=\"inline\">http.StripPrefix</code>.<br>6. **Внешние API** — <code class=\"inline\">cmd/coordinator/externalmetrics.go</code>: штатный хук <code class=\"inline\">client-go/tools/metrics</code> для Agones/k8s REST + общий <code class=\"inline\">http.RoundTripper</code> для DO/Vultr/OVH (три разных, проверенных по исходникам способа воткнуть транспорт).</p><p>Все изменения покрыты тестами, <code class=\"inline\">go build</code>/<code class=\"inline\">go vet</code>/<code class=\"inline\">go test ./...</code> (полный, с testcontainers) проходят чисто. Дашборд <code class=\"inline\">coordinator-process.json</code> собирает все новые метрики в одном месте.</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-13T16:19:47.410Z"
   }
 ]
