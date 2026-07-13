@@ -21965,5 +21965,29 @@
     "who": "ihar",
     "html": "<p>я думаю имеет смысл сделать так что бы активный билд запускался без перезагрузки, это правильно с точки зрения непрерывной работы игры при обновлении, билд потестировали активировали, зачем стопать все инстансы</p>",
     "ts": "2026-07-13T19:24:48.767Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Да, это правильное направление — и хорошая новость в том, что Agones уже умеет ровно это &quot;из коробки&quot;, писать логику ожидания сессий самим не придётся.</p><p>**Механизм**: у <code class=\"inline\">Fleet</code> есть встроенный rolling update — если поменять <code class=\"inline\">Fleet.Spec.Template</code> (образ/command/args) и сделать <code class=\"inline\">Update()</code> объекта, Agones-контроллер сам поднимает новый <code class=\"inline\">GameServerSet</code> с новым шаблоном и постепенно гасит старый, причём **Allocated (живые матчи) не трогает**, пока они не освободятся сами — тот же принцип, что уже описан в этом же файле для <code class=\"inline\">ScaleFleet</code> ([fleet.go:134-135](internal/coordinator/agones/fleet.go#L134-L135): &quot;Agones удаляет Ready-инстансы раньше Allocated&quot;). Это значит: старые матчи доигрывают на старом коде, новые буферные инстансы и новые матчи — уже на новом билде. Полностью закрывает risk #8, а не просто документирует его.</p><p>**Что нужно поменять** (звенья по слоям, переиспользуя существующий <code class=\"inline\">buildGameServerSpec</code> — уже единственный источник правды для пода, [fleet.go:190](internal/coordinator/agones/fleet.go#L190)):<br>1. <code class=\"inline\">agones.Client</code> — новый метод типа <code class=\"inline\">UpdateFleetTemplate</code> (Get → заменить только <code class=\"inline\">Spec.Template</code> → Update, паттерн один в один как <code class=\"inline\">ScaleFleet</code>, реплики не трогаем).<br>2. <code class=\"inline\">launcher</code> — новый метод <code class=\"inline\">ApplyActiveBuild</code>, который для уже запущенных регионов (<code class=\"inline\">region.ClusterID != nil</code>) пересобирает <code class=\"inline\">FleetSpec</code> (как в <code class=\"inline\">launchRegion</code>) и зовёt его.<br>3. <code class=\"inline\">dashboardapi.handleActivateBuild</code> — после <code class=\"inline\">SetActiveBuild</code> дергает этот метод, best-effort по регионам (как <code class=\"inline\">Launch</code> — outcomes, а не всё-или-ничего).<br>4. Убрать/поправить <code class=\"inline\">builds.launchCommandHint</code> — подсказка про &quot;надо рестартовать&quot; станет неверной.<br>5. Тесты на всех уровнях + **обязательная живая проверка через <code class=\"inline\">test-e2e-launcher</code>**: нужно фактически убедиться, что Allocated GameServer переживает апдейт шаблона, а Ready — пересоздаётся с новой командой (это поведение задокументировано у Agones, но не проверялось живьём в этом кластере — как и с node affinity, которую вы уже сверяли так же).</p><p>Главный тradeoff, который стоит держать в голове отдельно: rolling update не защищает от плохого билда — если новый билд сломан, он тихо заменит здоровый буфер сломанными инстансами без отката. Это отдельная задача (canary/health-gate), не блокер для этой фичи, но стоит отметить в PROJECT_MAP.md как новый открытый риск, когда сделаем.</p><p>Расписать это в план-файл с явными тасками (как обычно перед нетривиальной работой) и начинать?</p>",
+    "ts": "2026-07-13T19:26:21.743Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>здоровый буфер сломанными инстансами без отката, это на плечах индюка, он может откатить активировав предыдущий билд обратно</p>",
+    "ts": "2026-07-13T19:27:55.230Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Согласен, это снимает мой тезис — при живом апдейте отката как отдельной фичи не нужно, &quot;откатить&quot; = активировать предыдущий билд, и он точно так же укатится через тот же rolling-update механизм. Так что это не risk, а просто следствие того, что Activate становится живым действием — и хорошо, что деплой и роллбек становятся одной и той же операцией.</p><p>Перехожу в план-режим, чтобы расписать реализацию по слоям перед правками.</p>",
+    "ts": "2026-07-13T19:28:37.218Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>I&#x27;ll wait for this exploration to finish before drafting the plan.</p>",
+    "ts": "2026-07-13T19:28:59.264Z"
   }
 ]
