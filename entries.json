@@ -17753,5 +17753,17 @@
     "who": "ihar",
     "html": "<p>пометь добавить количесво нод в метрики для grafana</p>",
     "ts": "2026-07-13T01:51:00.596Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлено в <code class=\"inline\">PROJECT_MAP.md</code> (раздел 7, «Metrics &amp; logs pipeline») — отдельным пунктом: нужен новый гейдж с лейблом <code class=\"inline\">cluster_id</code> (без <code class=\"inline\">game_id</code>, это метрика уровня кластера) плюс источник данных — ни <code class=\"inline\">Collector</code>, ни <code class=\"inline\">agones.Client</code> сейчас не листят <code class=\"inline\">Node</code> вообще, только <code class=\"inline\">GameServer</code>/<code class=\"inline\">Pod</code>/Fleet-статусы.</p>",
+    "ts": "2026-07-13T01:51:31.353Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>спасибо, оцени работу за последние 14 часов по коммитам</p>",
+    "ts": "2026-07-13T01:54:10.530Z"
   }
 ]
