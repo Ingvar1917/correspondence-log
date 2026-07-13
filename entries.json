@@ -19811,5 +19811,95 @@
     "who": "claude",
     "html": "<p>Все 21 тестов проходят. Прогоню полный набор фронта и Go-часть целиком.</p>",
     "ts": "2026-07-13T18:09:00.376Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Добавлены:</p><p>**Backend** (<code class=\"inline\">internal/coordinator/instances/repository.go</code>):<br>- <code class=\"inline\">DeleteOne(ctx, gameID, instanceID)</code> — удаляет одну запись, но только если она <code class=\"inline\">ended_at IS NOT NULL</code> (<code class=\"inline\">ErrInstanceNotFound</code>, если инстанс ещё работает или не найден — работающий не удалить в принципе).<br>- <code class=\"inline\">DeleteAllCompleted(ctx, gameID)</code> — удаляет разом все завершённые для игры, работающие никогда не трогает.</p><p>**API** (<code class=\"inline\">dashboardapi</code>): <code class=\"inline\">DELETE /games/{id}/instances/{instance_id}</code> (204) и <code class=\"inline\">DELETE /games/{id}/instances</code> (200, <code class=\"inline\">{&quot;deleted&quot;: N}</code>).</p><p>**Frontend** (<code class=\"inline\">MonitoringTab.tsx</code>): кнопка **Delete** у каждой остановленной/завершённой строки (скрыта у running/pending), кнопка **Clear** в шапке секции — обе инвалидируют кэш инстансов после мутации.</p><p>Всё покрыто тестами (4 в <code class=\"inline\">instances</code>, 4 в <code class=\"inline\">dashboardapi</code>, 3 новых в vitest) — полный <code class=\"inline\">go test ./...</code> и весь фронтовый набор (tsc + 110 vitest-тестов) зелёные.</p>",
+    "ts": "2026-07-13T18:09:49.911Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>для запущенных инстансов добавь кнопку стоп</p>",
+    "ts": "2026-07-13T18:10:32.736Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю doc-комментарий <code class=\"inline\">resolveOwnedInstance</code> (упомянуть Stop тоже).</p>",
+    "ts": "2026-07-13T18:12:15.347Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку, потом добавлю route + handler в <code class=\"inline\">dashboardapi</code>.</p>",
+    "ts": "2026-07-13T18:12:36.676Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — добавлю сам хендлер рядом с <code class=\"inline\">handleStreamInstanceLogs</code>.</p>",
+    "ts": "2026-07-13T18:12:58.704Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю <code class=\"inline\">handleStopInstance</code> сразу после <code class=\"inline\">handleStreamInstanceLogs</code>.</p>",
+    "ts": "2026-07-13T18:13:08.435Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку.</p>",
+    "ts": "2026-07-13T18:13:17.585Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хороший образец. Добавлю аналогичные тесты для <code class=\"inline\">StopInstance</code>.</p>",
+    "ts": "2026-07-13T18:13:50.011Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогоню весь пакет <code class=\"inline\">launcher</code> и <code class=\"inline\">dashboardapi</code> целиком, потом добавлю тест на хендлер.</p>",
+    "ts": "2026-07-13T18:15:01.325Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Backend полностью готов и покрыт тестами. Теперь фронтенд — кнопка Stop для работающих инстансов.</p>",
+    "ts": "2026-07-13T18:15:59.166Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сама кнопка — рядом с &quot;Logs&quot; в ветке <code class=\"inline\">isInstanceRunning</code>.</p>",
+    "ts": "2026-07-13T18:16:14.908Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю i18n-ключ <code class=\"inline\">instances.stop</code>.</p>",
+    "ts": "2026-07-13T18:16:37.744Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю typecheck и прогоню тесты, затем добавлю тесты на новую кнопку.</p>",
+    "ts": "2026-07-13T18:16:49.362Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю тесты на Stop-кнопку рядом с тестами про Logs.</p>",
+    "ts": "2026-07-13T18:17:14.916Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 24 теста проходят. Финальный полный прогон.</p>",
+    "ts": "2026-07-13T18:17:36.216Z"
   }
 ]
