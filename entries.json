@@ -20039,5 +20039,17 @@
     "who": "claude",
     "html": "<p>Теперь добавлю строку &quot;External APIs&quot; в <code class=\"inline\">coordinator-process.json</code>.</p>",
     "ts": "2026-07-13T19:06:15.425Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавил панели для трёх метрик, которых не было ни в одном дашборде — все имена и лейблы проверил вживую через Prometheus API (не угадывал):</p><p>**<code class=\"inline\">coordinator-gameservers.json</code>** — новая панель **&quot;Instance terminations — rate by category&quot;** (<code class=\"inline\">coordinator_instances_terminations_total</code>, фильтр по <code class=\"inline\">$game</code>) — это счётчик из риска №15 сегодняшней сессии, теперь с категорией <code class=\"inline\">evicted</code> в списке значений. Сейчас пуст (в dev никто не падал/не вытеснялся с момента чистки БД) — появится при первом реальном завершении.</p><p>**<code class=\"inline\">coordinator-process.json</code>** — новая строка **&quot;External APIs (cloud provisioning + k8s clients)&quot;**:<br>- Cloud provisioning API (DO/Vultr/OVH) — rate по cloud/status и p99 duration. Проверил: метрика зарегистрирована, но пока не эмитит серий — в dev нет настроенных облачных токенов, появится при первом реальном provisioning-вызове.<br>- Kubernetes API client (Agones/k8s REST через <code class=\"inline\">client-go/tools/metrics</code>) — rate по host/code и p99 duration by verb/host. Подтверждено живыми данными в Prometheus прямо сейчас (реальные 1300+ запросов от dev-stack).</p><p>Оба JSON валидны, Grafana подхватит через провижининг (~30с).</p>",
+    "ts": "2026-07-13T19:07:49.889Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>я создаю новый билд, активирую, иду в мониторинг, стопаю один инстанс, появляется другой , но он не работает в режиме ошибки</p>",
+    "ts": "2026-07-13T19:14:08.338Z"
   }
 ]
