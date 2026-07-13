@@ -22715,5 +22715,107 @@
     "who": "claude",
     "html": "<p>Проверил — это два разных, не связанных друг с другом наблюдения.</p><p>**Строка <code class=\"inline\">sessionmanager</code>** — не про остановку конкретно. Смотрю код (<code class=\"inline\">sessionmanager/manager.go:113-127</code>): <code class=\"inline\">fleetGameID</code> (та самая ошибка) вызывается **только** в ветке <code class=\"inline\">GameServerStateReady</code> (чтобы разбудить очередь), а Stop/Delete идёт совсем другой веткой (<code class=\"inline\">MarkEndedByGameServerName</code>), которая game id вообще не резолвит. То, что она выскочила именно в момент стопа — совпадение по времени: она и раньше повторялась каждые ~10с независимо ни от чего (видели в первом логе — 23:08:41/50/23:09:01, задолго до вашего стопа). Просто у standalone Test-инстанса нет Fleet-лейбла в принципе (у него нет Fleet&#x27;а), <code class=\"inline\">DrainQueue</code> для него не нужен — это существовавший до нас, безобидный шумовой пробел, не связан с пропаданием строки.</p><p>**Пропадание старой остановленной строки** — это прямое следствие вчерашнего фикса, не баг. Test Launch — детерминированное имя (<code class=\"inline\">test-&lt;gameID&gt;</code>), <code class=\"inline\">(cluster_id, pod_name)</code> уникален → у него физически **одна ячейка истории**, не отдельная строка на каждый запуск. Как только вы перезапускаете тест, <code class=\"inline\">UpsertRunning</code> (который я только что чинил) корректно оживляет **ту же самую строку** — старое <code class=\"inline\">stopped/normal_exit</code> превращается в новое <code class=\"inline\">running</code>. С точки зрения Monitoring старая запись не удалилась — она физически стала новой. Fleet-инстансы так не теряются, потому что у них случайное имя каждый раз (отдельная строка навсегда, пока не подчистит GC).</p><p>Ваша интуиция верна в главном — оба явления (limit «один тест на игру» в <code class=\"inline\">game_test_instances</code>, PRIMARY KEY по <code class=\"inline\">game_id</code>, и пропадание истории в <code class=\"inline\">gameserver_instances</code>) растут из одного корня: **детерминированное имя = один слот, не история**. Это, скорее всего, ок для Test Launch как QA-инструмента (важен последний прогон, не архив всех кликов) — но если хотите видеть историю прошлых тестовых запусков отдельно, это отдельная переделка (учитывать <code class=\"inline\">pod.UID</code> в идентичности строки, не только <code class=\"inline\">pod_name</code>). Нужно?</p>",
     "ts": "2026-07-13T21:19:25.945Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>нужно</p>",
+    "ts": "2026-07-13T21:20:00.220Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Design: заменяю full <code class=\"inline\">UNIQUE(cluster_id, pod_name)</code> на **partial unique index** — <code class=\"inline\">WHERE ended_at IS NULL</code>. Живой инстанс по-прежнему ровно один на (cluster_id, pod_name) — ровно то, на что рассчитывают <code class=\"inline\">Watcher</code>/<code class=\"inline\">Collector</code>, сходясь на одну строку, пока под жив. Но как только строка завершается (<code class=\"inline\">ended_at</code> проставлен) — она выпадает из индекса, и следующий <code class=\"inline\">UpsertRunning</code> под тем же именем просто вставляет **новую** строку вместо перезаписи вчерашней. История сохраняется бесплатно, без архивной таблицы. Фронту менять ничего не нужно — строки уже ключуются по <code class=\"inline\">id</code>, не по <code class=\"inline\">pod_name</code>.</p>",
+    "ts": "2026-07-13T21:23:13.874Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Next migration is 000052.</p>",
+    "ts": "2026-07-13T21:23:17.972Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now updating the four upsert methods in <code class=\"inline\">repository.go</code>.</p>",
+    "ts": "2026-07-13T21:23:35.890Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s simplify <code class=\"inline\">UpsertRunning</code> and update all four ON CONFLICT clauses.</p>",
+    "ts": "2026-07-13T21:23:41.263Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now <code class=\"inline\">UpsertTermination</code>:</p>",
+    "ts": "2026-07-13T21:24:22.447Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s also update the <code class=\"inline\">Repository</code> type&#x27;s own doc comment mentioning the old full constraint, and build.</p>",
+    "ts": "2026-07-13T21:25:08.973Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Compiles. Let&#x27;s run the instances package tests to see exactly what breaks.</p>",
+    "ts": "2026-07-13T21:25:37.646Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Let me verify Postgres&#x27;s actual behavior directly against a real database, isolated from Go.</p>",
+    "ts": "2026-07-13T21:29:09.625Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Found the real bug via direct Postgres testing — a partial-index arbiter only catches a conflict when the **incoming row itself** also satisfies the predicate. Since <code class=\"inline\">UpsertTermination</code>&#x27;s row always has <code class=\"inline\">ended_at</code> set (never NULL), it can never conflict via that index — every termination was silently inserting a phantom new row instead of updating the live one. Rewriting it without <code class=\"inline\">ON CONFLICT</code>.</p>",
+    "ts": "2026-07-13T21:30:02.864Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Exactly the intended behavior now: normal termination stays 1 row, relaunch correctly preserves history as 2 rows. Now let&#x27;s run the full instances suite.</p>",
+    "ts": "2026-07-13T21:31:02.464Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the watcher test.</p>",
+    "ts": "2026-07-13T21:31:52.435Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now updating this test&#x27;s doc comment and assertions to match the new history-preserving behavior (2 rows expected).</p>",
+    "ts": "2026-07-13T21:32:12.673Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All pass now. Let&#x27;s add a dedicated end-to-end regression test proving history is preserved via the actual Watcher flow (running → stopped → relaunch same name → still running, both visible), then run the full suite.</p>",
+    "ts": "2026-07-13T21:32:47.022Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the full test suite.</p>",
+    "ts": "2026-07-13T21:33:30.815Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All green — <code class=\"inline\">db</code> package&#x27;s live migration test confirms 000052 applies/reverts cleanly. Now updating WHATIF.md to reflect the final design.</p>",
+    "ts": "2026-07-13T21:34:12.528Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. История Test Launch теперь сохраняется через реланч.</p><p>**Финальный дизайн**: <code class=\"inline\">UNIQUE(cluster_id, pod_name)</code> заменён на **partial unique index** (<code class=\"inline\">WHERE ended_at IS NULL</code>, миграция 000052). Живой инстанс по-прежнему один на (cluster_id, pod_name) — Watcher/Collector сходятся на одну строку, как и раньше. Завершённая строка выпадает из индекса — реланч под тем же именем просто вставляет новую строку, старая остаётся историей. Фронту менять ничего не пришлось.</p><p>По ходу поймал реальную граблю (доказано прямым прогоном в Postgres, не по документации): partial-index arbiter в <code class=\"inline\">ON CONFLICT ... WHERE predicate</code> засчитывает конфликт, только если **вставляемая строка сама удовлетворяет предикату**. Для <code class=\"inline\">UpsertTermination</code> это никогда не так (<code class=\"inline\">ended_at</code> всегда проставлен) — первая версия молча создавала фантомную строку на **каждое** завершение, включая обычный случай, оставляя живую строку висеть вечно. Переписал <code class=\"inline\">UpsertTermination</code> без <code class=\"inline\">ON CONFLICT</code> — явный <code class=\"inline\">UPDATE ... WHERE ended_at IS NULL</code>, и только если 0 строк обновилось — <code class=\"inline\">INSERT</code>.</p><p>Тесты: <code class=\"inline\">TestRepository_UpsertRunningAfterPriorTerminationPreservesHistoryAsNewRow</code>, <code class=\"inline\">TestWatcher_StopThenRelaunchUnderSameNamePreservesHistory</code>, обновлённые старые тесты (теперь ожидают 2 строки после реюза имени, не 1) — все проходят. Полный <code class=\"inline\">go test ./...</code> (включая живой прогон миграций в пакете <code class=\"inline\">db</code>) зелёный.</p><p>**Не забудьте**: <code class=\"inline\">make dev-stack</code> всё ещё крутит бинарь, собранный до всех сегодняшних правок — пересоберите (<code class=\"inline\">Ctrl+C</code> → <code class=\"inline\">make dev-stack</code>), чтобы проверить живьём.</p><p>commit: Test Launch теперь сохраняет историю прошлых запусков вместо перезаписи одной строки — UNIQUE(cluster_id,pod_name) заменён на partial unique index по живым инстансам, UpsertTermination переписан без ON CONFLICT (partial-index arbiter не ловит конфликт, если вставляемая строка сама не под предикатом).</p>",
+    "ts": "2026-07-13T21:35:01.953Z"
   }
 ]
