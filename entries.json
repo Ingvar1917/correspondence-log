@@ -19295,5 +19295,17 @@
     "who": "ihar",
     "html": "<p>записать и составить план действий</p>",
     "ts": "2026-07-13T16:55:58.344Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Записал в <code class=\"inline\">WHATIF.md</code> (пункт 1 плана закрытия DDoS, статус ⬜→🟡 — разведка проведена) и в <code class=\"inline\">PROJECT_MAP.md</code> (новый пункт node-level observability, рядом с node-count/disk-pressure).</p><p>Кстати, это уже третья по счёту находка, которая просит один и тот же новый механизм — раньше уже отмечали, что node-count и disk-pressure метрики &quot;разумно делать одной задачей node-level observability&quot;, а bandwidth ложится в ту же корзину: всем трём нужен один и тот же новый компонент — что-то, что видит живые k8s <code class=\"inline\">Node</code> объекты и собирает с них данные, чего сейчас в кодовой базе нет вообще.</p><p>**План действий** (порядок — от дешёвого/бесспорного к дорогому/непроверенному):</p><p>1. **Dev-контур** — добавить <code class=\"inline\">node-exporter</code> DaemonSet в <code class=\"inline\">deploy/local/setup-dev-extras.sh</code> рядом с Agones/metrics-server, чтобы <code class=\"inline\">make dev-up</code> сразу давал живой источник для разработки и проверки остального.<br>2. **Прод-провижининг** — тот же DaemonSet ставится при провижининге реального кластера, в <code class=\"inline\">provisioning.Manager.finish</code> (там же, где сейчас <code class=\"inline\">InstallAgones</code>) — либо расширить <code class=\"inline\">AgonesInstaller</code>, либо завести соседний интерфейс-установщик.<br>3. **Сбор** — новый маленький поллер по образцу <code class=\"inline\">metrics.Collector</code>/<code class=\"inline\">loopstats</code>: раз в интервал по каждому зарегистрированному кластеру дёргает node-exporter через уже освоенный Kubernetes Service-proxy (<code class=\"inline\">.../services/{name}/proxy/metrics</code>, тот же путь, что для pull-through cache), парсит <code class=\"inline\">node_network_receive_bytes_total</code>/<code class=\"inline\">transmit_bytes_total</code> по нужному интерфейсу.<br>4. **Экспорт** — свои Prometheus-гейджи, лейблы <code class=\"inline\">cluster_id</code>+<code class=\"inline\">node</code> (не <code class=\"inline\">game_id</code> — это не per-game метрика).<br>5. **Grafana** — панель в новом/существующем node-level дашборде, соседствующая с node-count и disk-pressure, когда те тоже будут сделаны.<br>6. **Верификация** — сначала на <code class=\"inline\">make dev-up</code>&#x27;s kind-кластере (бесплатно, без реального облака), и только потом — живой прогон на реальном DO/Vultr/OVH, где проверяется единственная реально непроверенная деталь: имя основного сетевого интерфейса ноды (<code class=\"inline\">eth0</code> и т.п.) на каждом образе — фильтрация loopback/veth/cni нужна аккуратно, чтобы не собирать мусорный трафик виртуальных интерфейсов.</p><p>Начинать реализацию сейчас, или план фиксируем и продолжаем позже?</p>",
+    "ts": "2026-07-13T16:57:59.851Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>фиксируем, не начинаем</p>",
+    "ts": "2026-07-13T16:59:11.201Z"
   }
 ]
