@@ -22997,5 +22997,29 @@
     "who": "claude",
     "html": "<p>Проверил — это не баг, и жёстко это не «чинится» так, как остальное сегодня.</p><p>**Live-проверка**: metrics-server сейчас работает нормально (<code class=\"inline\">kubectl get apiservices</code> → <code class=\"inline\">v1beta1.metrics.k8s.io Available=True</code>), сырой запрос к <code class=\"inline\">/apis/metrics.k8s.io/v1beta1/namespaces/default/pods</code> возвращает данные по всем подам прямо сейчас. Цикл коллектора в dev-stack тикнул уже 3 раза без единой ошибки на уровне всего тика (<code class=\"inline\">coordinator_loop_errors_total</code> для metrics-collector — пусто).</p><p>Значит эта конкретная строка в логе — одноразовый transient-сбой именно в тот момент (агрегационный слой apiserver↔metrics-server на секунду поперхнулся, вероятно из-за нагрузки на ноду kind от всех сегодняшних relaunch&#x27;ей/eviction-тестов), а не постоянная поломка.</p><p>Важно: наш код это уже **осознанно** обрабатывает как штатную деградацию, не как фатальную ошибку — если <code class=\"inline\">ListPodResourceUsage</code> падает на конкретном тике, коллектор просто пропускает CPU/RAM за этот тик (players/match-started всё равно пишутся отдельно, они не зависят от metrics-server), логирует и продолжает — следующий тик (через 30с) сам восстанавливается. Это то самое, ради чего лог вообще существует — сделать пробел видимым, а не молча его спрятать (тот же принцип, что у <code class=\"inline\">[sessionmanager]</code>, только там ошибка была постоянной и лишней, а тут — редкая и штатная).</p><p>Чинить нечего: убирать логирование значило бы прятать реальный (пусть и редкий) факт «в этот тик метрик не было» — то есть именно то, что этот проект сознательно не делает.</p>",
     "ts": "2026-07-13T21:52:41.534Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>2026/07/13 23:51:02 [metrics] list pod resource usage (metrics-server not installed?): list pod metrics in default: the server could not find the requested resource (get pods.metrics.k8s.io)<br>2026/07/13 23:51:32 [metrics] list pod resource usage (metrics-server not installed?): list pod metrics in default: the server could not find the requested resource (get pods.metrics.k8s.io)<br>2026/07/13 23:52:02 [metrics] list pod resource usage (metrics-server not installed?): list pod metrics in default: the server could not find the requested resource (get pods.metrics.k8s.io)<br>2026/07/13 23:52:32 [metrics] list pod resource usage (metrics-server not installed?): list pod metrics in default: the server could not find the requested resource (get pods.metrics.k8s.io)<br>2026/07/13 23:53:02 [metrics] list pod resource usage (metrics-server not installed?): list pod metrics in default: the server could not find the requested resource (get pods.metrics.k8s.io)</p><p>каждые 30 секунд</p>",
+    "ts": "2026-07-13T21:53:37.075Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю, чем именно вызван этот стабильный (не разовый) сбой у нашего процесса, раз он повторяется каждые 30с.</p>",
+    "ts": "2026-07-13T21:54:02.928Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Let me update the debug program accordingly.</p>",
+    "ts": "2026-07-13T21:56:48.046Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Не с тестовым инстансом — это вообще **другой кластер**.</p><p>Проверил напрямую (расшифровал сохранённые kubeconfig&#x27;и через <code class=\"inline\">clusterregistry.Repository</code>): в <code class=\"inline\">cluster_registry</code> зарегистрировано **два** живых кластера, каждый крутит свой собственный <code class=\"inline\">metrics.Collector</code> (тикает раз в 30с независимо):</p><p>1. <code class=\"inline\">coordinator-dev</code> (регион <code class=\"inline\">dev</code>) — тот, где живёт ваша игра и тестовый инстанс. Metrics-server там работает нормально, я это уже проверил.<br>2. <code class=\"inline\">coordinator-eu</code> (регион <code class=\"inline\">eu</code>) — отдельный kind-кластер, судя по всему поднятый через админский provisioning-флоу (<code class=\"inline\">provisioning.KindAdapter</code>, тот же, что для DO/Vultr/OVH) для тестирования этой фичи. Проверил: Agones там стоит и работает, а **metrics-server — нет вообще**, ни пода, ни <code class=\"inline\">APIService</code>. Именно этот кластер и спамит каждые 30с — его collector честно повторяет: «сходил за метриками, add-on&#x27;а нет».</p><p>Это ровно та же, уже описанная в коде, штатная деградация («metrics-server — опциональный add-on»), просто она относится не к вашей игре, а к второму, отдельно поднятому тестовому кластеру. Ваш тестовый инстанс тут вообще не участвует.</p><p>Что делать — на выбор:<br>1. Поставить metrics-server и на <code class=\"inline\">coordinator-eu</code> тоже (тем же способом, что <code class=\"inline\">setup-dev-extras.sh</code> ставит на <code class=\"inline\">dev</code>) — тихо, но лишний шаг ради кластера, который, возможно, был нужен только для проверки provisioning-флоу.<br>2. Если <code class=\"inline\">coordinator-eu</code> уже не нужен — снести (<code class=\"inline\">kind delete cluster --name coordinator-eu</code> + убрать строку из <code class=\"inline\">cluster_registry</code>) — тогда и лог пропадёт сам.<br>3. Оставить как есть — это не ошибка, просто шум от второго кластера без опционального add-on&#x27;а.</p><p>Какой вариант?</p>",
+    "ts": "2026-07-13T21:58:54.165Z"
   }
 ]
