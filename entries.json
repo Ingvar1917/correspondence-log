@@ -19703,5 +19703,113 @@
     "who": "claude",
     "html": "<p>Все 18 тестов проходят. Проверю typecheck и полный набор фронта на всякий случай.</p>",
     "ts": "2026-07-13T17:54:28.135Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Секция логов у остановленных/завершённых инстансов теперь называется **&quot;Logs&quot;** — так же, как кнопка у работающих (<code class=\"inline\">t(&#x27;deploy.instanceLogs&#x27;)</code>, тот же ключ переиспользован вместо отдельного <code class=\"inline\">instances.logTail</code>, который убрал как неиспользуемый). Тест обновлён, весь фронт (tsc + все 107 vitest-тестов) — чисто.</p>",
+    "ts": "2026-07-13T17:54:44.548Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>добавь кнопки delete для каждого остановленного инстанса и кнопку Clear для удаления всех остановленных инстансов</p>",
+    "ts": "2026-07-13T17:59:52.349Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю <code class=\"inline\">ErrInstanceNotFound</code>, <code class=\"inline\">DeleteOne</code>, <code class=\"inline\">DeleteAllCompleted</code> в <code class=\"inline\">instances/repository.go</code>.</p>",
+    "ts": "2026-07-13T18:01:37.825Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь сами методы — после <code class=\"inline\">PruneCompleted</code>.</p>",
+    "ts": "2026-07-13T18:01:52.383Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку пакета и напишу тесты для новых методов.</p>",
+    "ts": "2026-07-13T18:02:12.351Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хороший образец для копирования. Добавлю тесты для <code class=\"inline\">DeleteOne</code> и <code class=\"inline\">DeleteAllCompleted</code>.</p>",
+    "ts": "2026-07-13T18:02:39.961Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все тесты проходят. Теперь <code class=\"inline\">dashboardapi</code> — маршруты и хендлеры.</p>",
+    "ts": "2026-07-13T18:03:20.450Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь маршруты в <code class=\"inline\">server.go</code>.</p>",
+    "ts": "2026-07-13T18:03:37.856Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — сейчас добавлю сами хендлеры в <code class=\"inline\">handlers.go</code>, рядом с <code class=\"inline\">handleListInstances</code>.</p>",
+    "ts": "2026-07-13T18:03:52.703Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю DTO в <code class=\"inline\">dto.go</code>.</p>",
+    "ts": "2026-07-13T18:04:24.049Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю сборку и напишу тесты хендлеров.</p>",
+    "ts": "2026-07-13T18:04:39.910Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю новые тесты сразу перед <code class=\"inline\">TestListInstanceMetrics_ReturnsSeededHistory</code>.</p>",
+    "ts": "2026-07-13T18:05:26.323Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 4 backend-теста проходят. Теперь фронтенд — кнопки Delete/Clear в <code class=\"inline\">MonitoringTab.tsx</code>.</p>",
+    "ts": "2026-07-13T18:06:08.722Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь кнопка Delete в строке каждого инстанса — рядом с кнопкой графика.</p>",
+    "ts": "2026-07-13T18:07:11.875Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, <code class=\"inline\">id</code> уже есть в типе. Добавлю i18n-ключи.</p>",
+    "ts": "2026-07-13T18:07:36.460Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю typecheck и прогоню тесты.</p>",
+    "ts": "2026-07-13T18:07:55.088Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю два новых теста в конец файла, перед закрывающей скобкой <code class=\"inline\">describe</code>.</p>",
+    "ts": "2026-07-13T18:08:29.904Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 21 тестов проходят. Прогоню полный набор фронта и Go-часть целиком.</p>",
+    "ts": "2026-07-13T18:09:00.376Z"
   }
 ]
