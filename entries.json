@@ -19673,5 +19673,35 @@
     "who": "claude",
     "html": "<p>Готово. Итог по фиксу:</p><p>**Backend** (<code class=\"inline\">internal/coordinator/instances/</code>): новая колонка <code class=\"inline\">container_started_at</code> (миграция 000050), заполняется только когда <code class=\"inline\">Watcher</code> реально видит <code class=\"inline\">ContainerStateRunning</code>, а не просто &quot;ещё не terminated&quot; (что верно и для <code class=\"inline\">Pending</code>/<code class=\"inline\">ContainerCreating</code>). Значение монотонно — раз подтверждённое, никогда не сбрасывается обратно в NULL. Прокинуто в API (<code class=\"inline\">dashboardapi/dto.go</code>).</p><p>**Frontend** (<code class=\"inline\">MonitoringTab.tsx</code>): третий статус — **&quot;starting…&quot;** между &quot;под создан&quot; и &quot;контейнер реально работает&quot;; до подтверждения <code class=\"inline\">container_started_at</code> скрыты CPU/RAM, кнопка &quot;Logs&quot; и кнопка графика (у завершённых инстансов график остался — это постфактум-дебаг, не трогал).</p><p>Оба регрессионных теста (Go: <code class=\"inline\">TestWatcher_PendingPodIsRecordedWithoutContainerStartedAt</code>, <code class=\"inline\">TestWatcher_ContainerStartedAtIsSetOnceContainerReachesRunning</code>; фронт: тест на &quot;starting…&quot;-бейдж без CPU/RAM/Logs/графика) проходят. Полный <code class=\"inline\">go test ./...</code> и весь vitest-набор — зелёные.</p>",
     "ts": "2026-07-13T17:52:29.789Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>для остановленных инстансов логи называются &quot;Log at the moment of failure&quot; сделай название такое же как для запущенных</p>",
+    "ts": "2026-07-13T17:53:08.664Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Только одно место использования. Заменю на тот же ключ, что и у работающих инстансов, и уберу неиспользуемый.</p>",
+    "ts": "2026-07-13T17:53:33.056Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Уберу теперь неиспользуемый ключ из <code class=\"inline\">en.ts</code>.</p>",
+    "ts": "2026-07-13T17:53:43.264Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю и поправлю тест, который искал старый текст.</p>",
+    "ts": "2026-07-13T17:53:57.034Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 18 тестов проходят. Проверю typecheck и полный набор фронта на всякий случай.</p>",
+    "ts": "2026-07-13T17:54:28.135Z"
   }
 ]
