@@ -17345,5 +17345,11 @@
     "who": "claude",
     "html": "<p>Разные источники и разный смысл:</p><p>- **Ready replicas** — <code class=\"inline\">Fleet.Status.ReadyReplicas</code> напрямую от Agones (<code class=\"inline\">internal/coordinator/agones/deploystatus.go:141</code>). Это официальный счётчик самого Agones: сколько GameServer&#x27;ов в Fleet&#x27;е сейчас в состоянии Ready (готовы к аллокации). Источник — control plane Agones, не зависит от того, работает ли metrics-server.</p><p>- **Pods measured** — сколько из этих подов **реально попали в выдачу metrics-server** на этом тике (<code class=\"inline\">aggregateResourceUsage</code> в <code class=\"inline\">collector.go:345</code>, инкрементируется только когда для пода нашлись данные CPU/RAM). Это не про готовность/капасити, а про полноту данных для панелей CPU/Memory — по сути «на сколько подов из общего числа можно доверять цифрам CPU/Memory на этом графике».</p><p>На твоём скриншоте они совпадают (10 и 10) — это просто означает, что все 10 ready-подов в этот момент успешно отчитались в metrics-server. Расхождение возможно и ожидаемо: metrics-server отстаёт по времени (только что созданный под ещё не попал в его выдачу) или вообще недоступен в кластере — тогда <code class=\"inline\">Ready replicas</code> останется на реальном значении, а <code class=\"inline\">Pods measured</code> уйдёт в 0, и CPU/Memory графики за этот же период будут пустыми, хотя сами инстансы работают.</p>",
     "ts": "2026-07-13T00:48:20.080Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>в селектах account и game есть только один вариант All, а должен быть на данный момент один аккаунт и одна игра</p>",
+    "ts": "2026-07-13T00:51:31.483Z"
   }
 ]
