@@ -22457,5 +22457,23 @@
     "who": "claude",
     "html": "<p>Готово, обе задачи сделаны и покрыты тестами.</p><p>**Название билда в инстансах:**<br>- Билд-лейбл (<code class=\"inline\">builds.Build.Label</code>) теперь печётся в Pod как **аннотация** <code class=\"inline\">coordinator.dev/build-label</code>, а не k8s-лейбл — важный нюанс: индюк вводит произвольный текст (пробелы, эмодзи), а k8s-лейблы ограничены строгим regex/63 символами, с лейблом <code class=\"inline\">CreateFleet</code> падал бы на валидации. Подтвердил чтением исходников Agones — кастомные аннотации на Pod-шаблоне доживают до реального Pod&#x27;а без изменений.<br>- <code class=\"inline\">instances.Watcher</code> читает эту аннотацию при первой же встрече пода, кладёт в новую колонку <code class=\"inline\">gameserver_instances.build_label</code> (миграция 000051).<br>- Прокинуто через весь путь: <code class=\"inline\">agones.FleetSpec</code> → <code class=\"inline\">launcher.resolveLaunchSource</code>/<code class=\"inline\">testinstance.go</code> → <code class=\"inline\">dashboardapi.instanceView</code> → <code class=\"inline\">Instance.build_label</code> на фронте → бейдж рядом с регионом в Monitoring → Инстансы.<br>- Работает и для Test Launch, и для обычного Fleet-пути; для BYO-Docker игр (нет билда) — просто не показывается.</p><p>**Автоскролл логов:**<br>- В <code class=\"inline\">LogDrawer.tsx</code> живой tail раньше безусловно дёргал <code class=\"inline\">scrollTop</code> на каждую новую строку. Теперь — «прилипание ко низу»: если читатель уже был внизу, новые строки продолжают уводить вид вниз; если он проскроллил вверх читать историю — новые строки больше не выдёргивают его обратно.</p><p>Прогнан полный <code class=\"inline\">go test ./...</code> (включая живой прогон миграций через пакет <code class=\"inline\">db</code>), <code class=\"inline\">tsc --noEmit</code> и весь vitest (109/109) — всё зелёное.</p><p>commit: Добавлена индюком заданное имя билда к каждому инстансу (через Pod-аннотацию, не k8s-лейбл — билды могут содержать любые символы), и живой tail логов больше не сбрасывает скролл читателя вниз при новых строках.</p>",
     "ts": "2026-07-13T20:11:35.405Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>в live logs скролл логов перекрывается скроллом всей страницы</p>",
+    "ts": "2026-07-13T20:13:25.684Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ставлю <code class=\"inline\">overscroll-behavior: contain</code> на скроллящийся <code class=\"inline\">&lt;pre&gt;</code> — стандартный фикс для «скролл-чейнинга» (когда докрутка внутри блока до края продолжает крутить страницу под ним).</p>",
+    "ts": "2026-07-13T20:13:51.179Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Класс попал в собранный CSS, сборка чистая, все тесты проходят.</p><p>commit: В LogDrawer добавлен <code class=\"inline\">overscroll-contain</code> на скроллящийся блок логов — докрутка до края больше не протекает в скролл страницы под оверлеем.</p>",
+    "ts": "2026-07-13T20:14:33.202Z"
   }
 ]
