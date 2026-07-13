@@ -19049,5 +19049,185 @@
     "who": "ihar",
     "html": "<p>тогда разберем этот кейс ### 15. Disk I/O / ephemeral storage — noisy neighbor</p>",
     "ts": "2026-07-13T16:22:20.165Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Разобрался в текущем состоянии — два конкретных вывода, оба подтверждены по коду, не предположения.</p><p>**1. Заявленная в карте митигация не реализована.** Проверил <code class=\"inline\">internal/coordinator/agones/fleet.go:199-206</code> — там <code class=\"inline\">Requests</code>/<code class=\"inline\">Limits</code> выставлены только для <code class=\"inline\">ResourceMemory</code>/<code class=\"inline\">ResourceCPU</code>, <code class=\"inline\">ResourceEphemeralStorage</code> нет вообще. И в <code class=\"inline\">instancesize.Spec</code> (сетка S/M/L/XL, <code class=\"inline\">internal/coordinator/instancesize/instancesize.go:30-42</code>) тоже нет измерения под диск — только <code class=\"inline\">RAMMb</code>/<code class=\"inline\">CPUMilli</code>/<code class=\"inline\">WeightUnits</code>. То есть строчка &quot;Митигация: явный ephemeral-storage limit&quot; в карте — это описание намерения, не факт. <code class=\"inline\">ephemeral-storage</code> limit уже реально используется в проекте, но только для build-джобов (kaniko, <code class=\"inline\">buildcontroller/controller.go:321</code> — <code class=\"inline\">20Gi</code>) и unpacker&#x27;а, не для игровых Fleet&#x27;ов.</p><p>**2. Более интересная находка — что происходит, если лимита нет.** Без <code class=\"inline\">Limits[ephemeral-storage]</code> у конкретного пода kubelet не может точечно evict&#x27;нуть именно шумного соседа за превышение **его собственного** лимита (лимита просто нет) — вместо этого нода в целом уходит в <code class=\"inline\">DiskPressure</code>, и node-pressure eviction manager выбирает жертв эвристически по QoS+фактическому потреблению. Наши GameServer-поды — Guaranteed QoS (риск №9), это делает их *менее* вероятной целью, но не гарантирует защиту чужого пода от чужого шумного соседа — именно тот сценарий, который risk №15 описывает.</p><p>**3. Связка с тем, что мы чинили в начале сессии.** Проверил <code class=\"inline\">instances/watcher.go:279-286</code> (<code class=\"inline\">terminatedState</code>) — детект termination смотрит только на <code class=\"inline\">pod.Status.ContainerStatuses[].State.Terminated</code>, не на <code class=\"inline\">pod.Status.Reason == &quot;Evicted&quot;</code> (это поле уровня Pod, не контейнера). Если нода реально evict&#x27;ит под из-за диска, <code class=\"inline\">ContainerStatuses</code> может не дать чистого сигнала вовремя — тогда сработает уже наш <code class=\"inline\">Deleted</code>-фолбэк (<code class=\"inline\">recordStopped</code>, чинили этой сессией) и в дашборде это ляжет как обычный <code class=\"inline\">stopped</code>, неотличимо от ручной остановки. То есть если этот риск реализуется — индюк увидит &quot;инстанс остановился&quot;, а не &quot;тебя выселили из-за диска&quot;, и не поймёт причину.</p><p>Получается, полное закрытие риска №15 — это не одна правка, а две:<br>- добавить измерение диска в <code class=\"inline\">instancesize</code>-сетку + прокинуть в <code class=\"inline\">fleet.go</code> (симметрично RAM/CPU) — нужны конкретные цифры по тирам, это скорее продуктовое решение, чем инженерное;<br>- научить <code class=\"inline\">instances.Watcher</code> отличать <code class=\"inline\">Evicted</code> от обычного <code class=\"inline\">stopped</code> (проверка <code class=\"inline\">pod.Status.Reason</code>), чтобы у индюка была честная причина в дашборде.</p><p>Что делаем — фиксируем оба пункта как открытые в карте (design-only), или сразу берёмся за реализацию одного/обоих?</p>",
+    "ts": "2026-07-13T16:24:07.491Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>делаем оба</p>",
+    "ts": "2026-07-13T16:28:13.043Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, паттерн понятен. Найду миграцию по <code class=\"inline\">stopped</code> как образец для новой.</p>",
+    "ts": "2026-07-13T16:29:35.028Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Начинаю с сетки размеров.</p>",
+    "ts": "2026-07-13T16:30:38.619Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю тесты этого пакета — возможно, там жёстко зашиты значения specs.</p>",
+    "ts": "2026-07-13T16:30:51.642Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Задача A1 готова. Теперь A2 — прокидка в <code class=\"inline\">agones.FleetSpec</code>/<code class=\"inline\">buildGameServerSpec</code>.</p>",
+    "ts": "2026-07-13T16:31:19.143Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю <code class=\"inline\">FleetSpec</code> и <code class=\"inline\">buildGameServerSpec</code>.</p>",
+    "ts": "2026-07-13T16:31:36.066Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь блок ресурсов в <code class=\"inline\">buildGameServerSpec</code>.</p>",
+    "ts": "2026-07-13T16:31:44.794Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю <code class=\"inline\">EphemeralStorageMb</code> в тестовую спеку и ассерт по нему в цикле Guaranteed QoS.</p>",
+    "ts": "2026-07-13T16:32:05.544Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверю testinstance_test.go на предмет аналогичных ассертов ресурсов и запущу тесты пакета.</p>",
+    "ts": "2026-07-13T16:32:29.111Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тест проходит, только нужен gofmt.</p>",
+    "ts": "2026-07-13T16:32:48.188Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, gofmt применился. Прогоню весь пакет agones.</p>",
+    "ts": "2026-07-13T16:32:55.367Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Задача A2 закрыта. Переходим к A3 — прокидка <code class=\"inline\">EphemeralStorageMb</code> через <code class=\"inline\">launcher.go</code>/<code class=\"inline\">testinstance.go</code>.</p>",
+    "ts": "2026-07-13T16:33:05.156Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тесты прошли, gofmt применён. Задача A3 закрыта. Переходим к Task B — детект Evicted.</p>",
+    "ts": "2026-07-13T16:33:55.520Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь миграция.</p>",
+    "ts": "2026-07-13T16:34:18.988Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — сейчас добавлю метод <code class=\"inline\">recordEvicted</code> рядом с <code class=\"inline\">recordStopped</code>.</p>",
+    "ts": "2026-07-13T16:35:01.177Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь напишу тесты для этого поведения — посмотрю существующий testHarness.</p>",
+    "ts": "2026-07-13T16:35:34.380Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю два теста в конец файла.</p>",
+    "ts": "2026-07-13T16:36:02.719Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Оба теста проходят, включая доказательство приоритета <code class=\"inline\">Evicted</code> над container-level статусом. Прогоню пакет целиком и обновлю статус задач 4/5.</p>",
+    "ts": "2026-07-13T16:36:31.085Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">dashboardapi/handlers.go</code>.</p>",
+    "ts": "2026-07-13T16:36:56.173Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Задача 6 закрыта. Теперь фронтенд.</p>",
+    "ts": "2026-07-13T16:37:34.882Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновлю тип/массив фильтров и <code class=\"inline\">categoryBadge</code>.</p>",
+    "ts": "2026-07-13T16:37:55.566Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">en.ts</code>.</p>",
+    "ts": "2026-07-13T16:38:17.891Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавлю аналогичный тест для <code class=\"inline\">evicted</code> сразу после теста про <code class=\"inline\">stopped</code>.</p>",
+    "ts": "2026-07-13T16:38:39.309Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогоню фронт-тесты (<code class=\"inline\">test-ui</code>/vitest).</p>",
+    "ts": "2026-07-13T16:38:49.185Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 17 тестов проходят. Проверю typecheck и полный <code class=\"inline\">test-ui</code>/сборку фронта.</p>",
+    "ts": "2026-07-13T16:38:56.901Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Задача 7 закрыта. Финальный полный прогон Go-части и обновление <code class=\"inline\">PROJECT_MAP.md</code>.</p>",
+    "ts": "2026-07-13T16:39:12.776Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Только уже известная преэкзистентная проблема. Полный тестовый прогон:</p>",
+    "ts": "2026-07-13T16:39:40.837Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Теперь обновлю риск №15 в <code class=\"inline\">PROJECT_MAP.md</code>.</p>",
+    "ts": "2026-07-13T16:40:17.442Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Риск №15 полностью закрыт — обе части реализованы, протестированы (Go: <code class=\"inline\">go build</code>/<code class=\"inline\">go vet</code>/полный <code class=\"inline\">go test ./...</code> с testcontainers; фронт: vitest + tsc), карта обновлена.</p><p>**Что сделано:**<br>1. **Митигация** — <code class=\"inline\">instancesize.Spec.EphemeralStorageMb</code> (S/M/L/XL = 1/2/4/8 GiB, эвристика &quot;2×RAM&quot;, явно помечена как первая прикидка) прокинута в <code class=\"inline\">agones.FleetSpec</code> → <code class=\"inline\">Resources.Requests/Limits[ResourceEphemeralStorage]</code>, Guaranteed QoS как у RAM/CPU — одним изменением покрыты и Fleet, и Test Launch (общая <code class=\"inline\">buildGameServerSpec</code>).<br>2. **Детект** — новая категория <code class=\"inline\">CategoryEvicted</code> (миграция <code class=\"inline\">000049</code>), <code class=\"inline\">instances.Watcher</code> теперь проверяет <code class=\"inline\">pod.Status.Reason == &quot;Evicted&quot;</code> **до** и **независимо** от контейнерного статуса — доказано тестом, что это работает, даже когда контейнер выдаёт вводящий в заблуждение <code class=\"inline\">Terminated{Reason:&quot;Error&quot;}</code>. Прокинуто до Indie Dashboard (фильтр, бейдж, i18n).</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-13T16:41:12.995Z"
   }
 ]
