@@ -18707,5 +18707,17 @@
     "who": "ihar",
     "html": "<p>давай поговорим про метрики самого координатора, что нам важно видеть и почему?</p>",
     "ts": "2026-07-13T15:37:53.014Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Смотрю с точки зрения &quot;мы single point of failure&quot;: координатор — один процесс (без leader election, одна реплика), если он тормозит/падает/копит утечку — встаёт вся платформа целиком, а не одна игра. Поэтому его собственные метрики даже важнее, чем метрики отдельных GameServer&#x27;ов. Разложу по слоям:</p><p>**1. Здоровье процесса (уже есть бесплатно)** — <code class=\"inline\">promhttp.Handler()</code> в [wiring.go:418](cmd/coordinator/wiring.go#L418) регистрирует дефолтный registry client_golang, а он сам по себе тащит <code class=\"inline\">go_goroutines</code>, <code class=\"inline\">go_gc_duration_seconds</code>, <code class=\"inline\">process_resident_memory_bytes</code>, <code class=\"inline\">process_cpu_seconds_total</code>, <code class=\"inline\">process_open_fds</code>. Это уже собирается, просто, кажется, никто не смотрел в Grafana — можно сразу нарисовать панель, без единой строчки кода.</p><p>**2. HTTP-слой (dashboard/admin API)** — классический RED (rate/errors/duration) по хендлерам. Сейчас этого нет вообще — если у индюка тормозит дашборд, мы узнаём об этом только от него самого, не из метрик.</p><p>**3. Здоровье фоновых циклов** — вот это, по-моему, самое дырявое место. <code class=\"inline\">metrics.Collector.Run</code>, <code class=\"inline\">instances.Watcher</code>, <code class=\"inline\">provisioning.Manager.Run</code> — тикают на интервалах (30с/15мин/и т.д.) и при ошибке просто <code class=\"inline\">log.Printf</code>. Нет метрики &quot;сколько длился последний тик&quot; и &quot;сколько ошибок подряд&quot; — если <code class=\"inline\">Collector</code> начнёт зависать дольше своего же интервала, метрики игр тихо протухнут, а мы не заметим, пока индюк не спросит &quot;почему у меня график не обновляется третий час&quot;.</p><p>**4. Пул соединений с Postgres** — <code class=\"inline\">sql.DB.Stats()</code> (open/idle/in-use, wait count/duration) даёт сигнал об исчерпании пула раньше, чем это долетит как таймауты в HTTP-хендлерах.</p><p>**5. Внешние зависимости** — латency/error-rate вызовов к Agones API каждого кластера и к cloud-API (DO/Vultr/OVH) при provisioning. Это чужие системы, которые могут тормозить/ready-лимитить нас, а сейчас мы это тоже не видим численно, только по логам постфактум.</p><p>**6. Согласованность состояния (не perf, а correctness)** — например, provisioning job, застрявший в статусе <code class=\"inline\">provisioning</code> дольше N минут, или расхождение <code class=\"inline\">game_regions</code> vs реальных Fleet&#x27;ов в кластере. Это ближе к бизнес-алертам, чем к обычным метрикам, но именно такие вещи мы уже дважды ловили руками в этой сессии (orphan-кластер, <code class=\"inline\">game_id</code> race).</p><p>С чего хочешь начать — с самого дырявого места (п.3, здоровье фоновых циклов) или пойдём по порядку?</p>",
+    "ts": "2026-07-13T15:38:42.761Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>сперва составим план по каждому пункту</p>",
+    "ts": "2026-07-13T15:40:08.504Z"
   }
 ]
