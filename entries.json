@@ -22853,5 +22853,137 @@
     "who": "claude",
     "html": "<p>Всё зелёное. Исправлено: <code class=\"inline\">sessionmanager.Manager.handle</code> теперь тихо пропускает standalone GameServer&#x27;ы (нет <code class=\"inline\">agones.dev/fleet</code>-лейбла — Test Launch, не Fleet) вместо логирования ошибки на каждую сработку в <code class=\"inline\">Ready</code>. Настоящий сломанный/непустой лейбл по-прежнему логируется. Тест <code class=\"inline\">TestManager_ReadyEvent_StandaloneGameServerIsSkippedSilently</code> подтверждает.</p><p>commit: session-manager больше не спамит &quot;fleet label is not a game id&quot; для standalone Test Launch инстансов — тихо пропускает их вместо DrainQueue, которого у них и не может быть.</p>",
     "ts": "2026-07-13T21:38:25.959Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>старые метрики подтянулись, имя не уникально</p>",
+    "ts": "2026-07-13T21:38:55.077Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now adding <code class=\"inline\">GetOne</code> right after <code class=\"inline\">ListByGame</code>.</p>",
+    "ts": "2026-07-13T21:40:36.900Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Good, both already imported.</p>",
+    "ts": "2026-07-13T21:40:51.377Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now updating the dashboardapi handler and route.</p>",
+    "ts": "2026-07-13T21:41:36.799Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Good, plain <code class=\"inline\">*instances.Repository</code>, so <code class=\"inline\">GetOne</code> is directly accessible. Let&#x27;s update the route and handler.</p>",
+    "ts": "2026-07-13T21:41:48.640Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the handler:</p>",
+    "ts": "2026-07-13T21:42:02.548Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Compiles. Now the frontend.</p>",
+    "ts": "2026-07-13T21:42:27.159Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now switching <code class=\"inline\">chartFor</code> and the fetch to key by <code class=\"inline\">inst.id</code> instead of <code class=\"inline\">inst.pod_name</code>.</p>",
+    "ts": "2026-07-13T21:42:47.806Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the <code class=\"inline\">InstanceMetricCharts</code> component itself:</p>",
+    "ts": "2026-07-13T21:43:02.819Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Clean. Now let&#x27;s check and update the frontend tests referencing the old URL shape.</p>",
+    "ts": "2026-07-13T21:43:26.760Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All pass. Now Go backend tests for the changed pieces.</p>",
+    "ts": "2026-07-13T21:44:15.616Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s add a dedicated test proving the time-window scoping works, right after the existing <code class=\"inline\">TestRepository_InsertInstanceSnapshotsAndListInstanceMetrics</code>.</p>",
+    "ts": "2026-07-13T21:44:57.495Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s check and update the dashboardapi test for this endpoint.</p>",
+    "ts": "2026-07-13T21:45:34.102Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Both pass. Let&#x27;s verify the new test actually catches the regression by temporarily reverting the window-scoping.</p>",
+    "ts": "2026-07-13T21:46:33.401Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Confirmed: fails without the fix exactly as expected. Restoring it.</p>",
+    "ts": "2026-07-13T21:46:46.406Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Restored and passing. Now let&#x27;s add a repository-level test for <code class=\"inline\">GetOne</code>, then run the full suite.</p>",
+    "ts": "2026-07-13T21:47:08.774Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Let&#x27;s add <code class=\"inline\">GetOne</code> tests right after <code class=\"inline\">TestRepository_ListByGameFiltersByCategory</code>.</p>",
+    "ts": "2026-07-13T21:47:19.548Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All pass. Now let&#x27;s run the full instances package and then the whole suite.</p>",
+    "ts": "2026-07-13T21:48:10.668Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now updating WHATIF.md and running the complete suite.</p>",
+    "ts": "2026-07-13T21:48:22.214Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Adding a fourth layer to this same incident chain.</p>",
+    "ts": "2026-07-13T21:48:37.712Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the full suite, backend and frontend.</p>",
+    "ts": "2026-07-13T21:48:56.484Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное — Go (полный <code class=\"inline\">go test ./...</code>) и фронт (<code class=\"inline\">tsc</code> + 110/110 vitest).</p><p>**Четвёртый слой того же расследования**: <code class=\"inline\">gameserver_instance_metrics</code> — отдельная от <code class=\"inline\">gameserver_instances</code> таблица, чистый append-only тик-лог, читалась по голому <code class=\"inline\">(game_id, pod_name)</code> — без понятия «какой физический под». Отсюда график с часом истории для только что запущенного инстанса, ровно как вы и сформулировали: «имя не уникально».</p><p>**Исправлено**: эндпоинт теперь ключуется по <code class=\"inline\">instance_id</code>, не <code class=\"inline\">pod_name</code> — сначала резолвится конкретная строка <code class=\"inline\">gameserver_instances</code> (<code class=\"inline\">GetOne</code>, новый метод, работает и для живых), берётся её собственное окно <code class=\"inline\">[started_at, ended_at]</code>, и метрики читаются только внутри этого окна — тики чужого забега под тем же именем физически не могут туда попасть. Фронт переключён на <code class=\"inline\">inst.id</code> (тот же паттерн, что уже был у Delete).</p><p>Тесты (включая проверку &quot;падает без фикса, проходит с ним&quot; вручную) — все проходят.</p><p>commit: График метрик инстанса больше не тянет историю чужих запусков под тем же переиспользованным именем (Test Launch) — эндпоинт и чтение теперь скопированы по конкретному instance_id и его собственному временному окну, а не по голому pod_name.</p>",
+    "ts": "2026-07-13T21:49:45.131Z"
   }
 ]
