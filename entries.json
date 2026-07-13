@@ -17153,5 +17153,113 @@
     "who": "claude",
     "html": "<p>Цепочка работает: аккаунт <code class=\"inline\">d@d.d2</code> → игра <code class=\"inline\">111</code> (тот самый <code class=\"inline\">game_id=fce98936...</code>, с которым возились весь разговор). Проверю сам regex-фильтр на панели через Prometheus datasource.</p>",
     "ts": "2026-07-13T00:27:51.095Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>**Фильтр аккаунт/игра применён и подтверждён живьём** — датасорс Postgres на связи, цепочка <code class=\"inline\">account → game</code> реально резолвится (аккаунт <code class=\"inline\">d@d.d2</code> → игра <code class=\"inline\">111</code>), regex-фильтр по <code class=\"inline\">game_id</code> в Prometheus работает. Открой дашборд в Grafana — сверху появились дропдауны Account/Game.</p><p>Теперь про новую часть — по своему же новому правилу, вердикт вместо сразу правок:</p><p>**Задача:** (а) показывать тариф аккаунта (free/paid) и (б) на общих графиках без фильтра — две кривые, агрегированные по free/paid.</p><p>**Проблема:** тариф — это то же самое ограничение, что было с аккаунтом: <code class=\"inline\">tariff_id</code> тоже не лейбл в Prometheus, это поле <code class=\"inline\">games.tariff_id</code> в Postgres. Но в отличие от <code class=\"inline\">account_id</code> (потенциально сотни разных значений — плохо как лейбл), тарифов всего 5 (<code class=\"inline\">free/hobby/indie/studio/publisher</code>) — низкая кардинальность, это нормальный кандидат в лейбл. Тут два пути:</p><p>1. **Добавить <code class=\"inline\">tariff_id</code> как лейбл прямо в <code class=\"inline\">Exporter</code>/<code class=\"inline\">Collector</code>** (бэкенд coordinator&#x27;а) — тогда <code class=\"inline\">sum by (tariff_id) (coordinator_gameserver_ready_replicas)</code> даёт ровно нужные кривые «по тарифу» из коробки, надёжно и точно. Цена: <code class=\"inline\">Collector</code> сейчас не знает тарифов игр вообще (нет зависимости от <code class=\"inline\">games</code>-репозитория) — нужно добавить туда лёгкий lookup (скорее всего закешированную карту game→tariff, обновляемую периодически, не дёргать БД на каждый тик).<br>2. **Сделать это только в Grafana** через join с Postgres — технически возможно, но join временного ряда Prometheus с таблицей Postgres по <code class=\"inline\">game_id</code> перед агрегацией (<code class=\"inline\">sum by tariff</code>) в Grafana хрупкий и плохо ложится на дашборд-JSON (transform&#x27;ы для этого не предназначены).</p><p>Рекомендую (1): чище, надёжнее, разовая правка в <code class=\"inline\">metrics</code>-пакете (в духе того, что мы уже сегодня там правили с <code class=\"inline\">Forget</code>). «Показывать статус free/paid» тогда тоже решается — либо отдельным полем в легенде/дропдауне игры (<code class=\"inline\">name [tariff]</code>), либо просто по цвету линии в новой панели «By tariff».</p><p>Насчёт «только если не указан фильтр» — Grafana не умеет чисто прятать панель по значению переменной без хрупких обходных путей; предлагаю не городить условную видимость, а просто добавить отдельную панель/ряд «By tariff (free vs paid)», которая всегда агрегирует по всем играм независимо от фильтра — она осмысленна и при выбранном фильтре тоже (просто там будет видно, к какой из двух кривых относится выбранная игра).</p><p>Ок делать так (бэкенд-лейбл + отдельная панель, всегда видимая), или предпочитаешь другой вариант?</p>",
+    "ts": "2026-07-13T00:28:12.770Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>ок делать так</p>",
+    "ts": "2026-07-13T00:29:30.310Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Начинаю реализацию. Сначала бэкенд: метод <code class=\"inline\">games.Repository</code>, интерфейс/поле в <code class=\"inline\">Collector</code>, лейбл <code class=\"inline\">tariff_id</code> в <code class=\"inline\">Exporter</code>.</p>",
+    "ts": "2026-07-13T00:32:42.747Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">metrics.go</code> — добавляю <code class=\"inline\">TariffID</code> в <code class=\"inline\">Snapshot</code>.</p>",
+    "ts": "2026-07-13T00:33:21.419Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо. Теперь <code class=\"inline\">exporter.go</code> — добавляю лейбл <code class=\"inline\">tariff_id</code> и меняю <code class=\"inline\">Forget</code> на <code class=\"inline\">DeletePartialMatch</code>.</p>",
+    "ts": "2026-07-13T00:33:39.277Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">collector.go</code> — интерфейс <code class=\"inline\">GameTariffs</code>, поле, использование в <code class=\"inline\">collectOnce</code>.</p>",
+    "ts": "2026-07-13T00:34:06.586Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">collectOnce</code> — добавляю fetch тарифов и проброс в <code class=\"inline\">Snapshot</code>.</p>",
+    "ts": "2026-07-13T00:34:35.354Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь чиню <code class=\"inline\">wiring.go</code>.</p>",
+    "ts": "2026-07-13T00:35:01.072Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь фикс тестов: добавляю <code class=\"inline\">fakeGameTariffs</code> и правлю все 13 вызовов <code class=\"inline\">metrics.New</code>.</p>",
+    "ts": "2026-07-13T00:35:39.544Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь правлю все вызовы <code class=\"inline\">metrics.New(...)</code>.</p>",
+    "ts": "2026-07-13T00:35:51.230Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All 13 вызовов поправлены sed&#x27;ом, дополняю компиляцию.</p>",
+    "ts": "2026-07-13T00:36:04.953Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь добавлю тест на реальную работу <code class=\"inline\">tariff_id</code> лейбла (что <code class=\"inline\">Observe</code> его проставляет и <code class=\"inline\">Forget</code> чистит независимо от значения тарифа), и прогоню всё.</p>",
+    "ts": "2026-07-13T00:36:14.050Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавлю тест на сам лейбл <code class=\"inline\">tariff_id</code>.</p>",
+    "ts": "2026-07-13T00:36:35.049Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется чисто. Прогоняю полный набор тестов пакета <code class=\"inline\">metrics</code> и <code class=\"inline\">games</code>.</p>",
+    "ts": "2026-07-13T00:36:54.315Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все зелёные. Теперь тест на новый метод <code class=\"inline\">games.Repository.ListTariffsByGameID</code>.</p>",
+    "ts": "2026-07-13T00:37:10.887Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проходит. Теперь полный прогон репозитория целиком, как того требует CLAUDE.md для изменений такого рода.</p>",
+    "ts": "2026-07-13T00:38:03.007Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Теперь обновлю дашборд Grafana: добавлю панель «By tariff (free vs paid)» и добавлю <code class=\"inline\">tariff_id</code> в легенды существующих панелей.</p>",
+    "ts": "2026-07-13T00:38:37.362Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Дашборд обновлён (панель «By tariff — free vs paid», <code class=\"inline\">tariff_id</code> добавлен в легенды). Перезапускаю Grafana, чтобы подхватить JSON, и проверяю его валидность — саму сборку coordinator&#x27;а перезапускать не стал, это уже трогает твой текущий dev-процесс.</p>",
+    "ts": "2026-07-13T00:39:34.435Z"
   }
 ]
