@@ -21989,5 +21989,137 @@
     "who": "claude",
     "html": "<p>I&#x27;ll wait for this exploration to finish before drafting the plan.</p>",
     "ts": "2026-07-13T19:28:59.264Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>The agent is running in the background — I&#x27;ll get notified automatically when it&#x27;s done, so no need to poll.</p>",
+    "ts": "2026-07-13T19:29:03.642Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>&lt;task-notification&gt;<br>&lt;task-id&gt;ad6312a4cd79fb033&lt;/task-id&gt;<br>&lt;tool-use-id&gt;toolu_011vcFXBwB52rxCZTx1YjRf3&lt;/tool-use-id&gt;<br>&lt;output-file&gt;/tmp/claude-1000/-home-ihar-Games-ludarium-coordinator/ccac3002-8530-4477-84c1-21e86f915dba/tasks/ad6312a4cd79fb033.output&lt;/output-file&gt;<br>&lt;status&gt;completed&lt;/status&gt;<br>&lt;summary&gt;Agent &quot;Explore build-activate and fleet-update code paths&quot; finished&lt;/summary&gt;<br>&lt;note&gt;A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.&lt;/note&gt;<br>&lt;result&gt;I now have all the facts needed. Here&#x27;s the report.</p><p>## 1. <code class=\"inline\">handleActivateBuild</code></p><p>Route registration — <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/dashboardapi/server.go:106</code>:<br>\u0000FENCE0\u0000</p><p>Full function — <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/dashboardapi/builds.go:257-296</code>:<br>\u0000FENCE1\u0000<br>Calls <code class=\"inline\">s.builds.Get</code> (builds.Repository) then <code class=\"inline\">s.games.SetActiveBuild(ctx, gameID, accountID, buildID)</code> — defined at <code class=\"inline\">internal/coordinator/games/repository.go:245</code>. This handler only touches Postgres via <code class=\"inline\">s.games</code> — it never calls into the launcher or Agones, confirming the gap the feature needs to fill.</p><p>Test — <code class=\"inline\">TestActivateBuild_SetsActive</code>, <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/dashboardapi/builds_test.go:179-202</code>:<br>\u0000FENCE2\u0000<br>Seeding pattern (helpers used above): <code class=\"inline\">registerAndLogin</code> (<code class=\"inline\">handlers_test.go:255</code>) → <code class=\"inline\">createGame</code> (<code class=\"inline\">handlers_test.go:1292</code>, POST <code class=\"inline\">/games</code> with <code class=\"inline\">image_url</code>/<code class=\"inline\">lobby_mode</code>) → <code class=\"inline\">initBuild</code> (<code class=\"inline\">builds_test.go:35</code>, POST <code class=\"inline\">/games/{id}/builds</code>) → <code class=\"inline\">completeAndMakeReady</code> (<code class=\"inline\">builds_test.go:161-177</code>, drives the build through <code class=\"inline\">complete</code> then directly calls <code class=\"inline\">builds.Repository.MarkBuilding</code>/<code class=\"inline\">MarkReady</code> to bypass the async pipeline).</p><p>There&#x27;s also an existing test that launches a Fleet and then mutates builds — <code class=\"inline\">TestDeleteBuild_ActiveBuild_StopsGameClearsActiveThenDeletes</code> (<code class=\"inline\">builds_test.go:210</code> onward) — this is the closest existing precedent for a test that combines build-state changes with a real Fleet in a fake cluster (<code class=\"inline\">env.router.registerRegion(t, env.db, &quot;eu&quot;)</code>, then <code class=\"inline\">PUT /games/{id}/regions/eu</code>, <code class=\"inline\">POST /games/{id}/launch</code>, then asserting via <code class=\"inline\">euFake.AgonesV1().Fleets(&quot;default&quot;).Get(...)</code>).</p><p>## 2. <code class=\"inline\">resolveLaunchSource</code></p><p><code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/launcher/launcher.go:184-219</code>:<br>\u0000FENCE3\u0000<br>Called once per <code class=\"inline\">Launch</code> call at <code class=\"inline\">launcher.go:285</code> (before the per-region loop), then passed into <code class=\"inline\">launchRegion</code> at <code class=\"inline\">launcher.go:305</code> where it&#x27;s used to build <code class=\"inline\">agones.FleetSpec{GameImage: source.image, GameCommand: ..., ...}</code> starting at <code class=\"inline\">launcher.go:315-318</code>.</p><p>Note relevant to the new feature: in <code class=\"inline\">Launch</code> (<code class=\"inline\">launcher.go:247-303</code>), regions already launched (<code class=\"inline\">region.ClusterID != nil</code>) are skipped entirely (<code class=\"inline\">launcher.go:296-299</code>, <code class=\"inline\">RegionOutcomeAlreadyLaunched</code>) — <code class=\"inline\">resolveLaunchSource</code>/<code class=\"inline\">launchRegion</code> never runs against them today, meaning there&#x27;s currently no code path that reapplies a new <code class=\"inline\">launchSource</code> against an already-running Fleet.</p><p>## 3. <code class=\"inline\">builds.launchCommandHint</code> UI copy</p><p>i18n string — <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/dashboardui/src/i18n/en.ts:81</code>:<br>\u0000FENCE4\u0000<br>Neighboring keys (<code class=\"inline\">en.ts:75-84</code>) include <code class=\"inline\">builds.activeBadge: &#x27;active — used for launches&#x27;</code>, <code class=\"inline\">builds.activate: &#x27;Activate&#x27;</code>, <code class=\"inline\">builds.launchCommandLabel: &#x27;launch command&#x27;</code>.</p><p>Rendered in <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/dashboardui/src/features/builds/BuildRow.tsx:112-134</code>, inside <code class=\"inline\">LaunchCommandRow</code>:<br>\u0000FENCE5\u0000<br>This hint is shown next to the editable launch-command field on a <code class=\"inline\">ready</code> build row (rendered conditionally at <code class=\"inline\">BuildRow.tsx:92-93</code>: <code class=\"inline\">{build.status === &#x27;ready&#x27; &amp;amp;&amp;amp; &amp;lt;LaunchCommandRow ... /&amp;gt;}</code>). Currently the copy says the command &quot;applies on restart&quot; — this is the text that would need to change if activation pushes live (i.e. it would no longer be strictly true that it only applies &quot;on restart&quot;).</p><p>## 4. <code class=\"inline\">ScaleFleet</code> tests</p><p><code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/agones/fleet_test.go:154-183</code>:<br>\u0000FENCE6\u0000<br>Pattern: <code class=\"inline\">agonesfake.NewSimpleClientset()</code> → <code class=\"inline\">agones.NewClient(fakeClientset)</code>; a Fleet is created first via <code class=\"inline\">CreateFleet</code>; assertion re-fetches the object with <code class=\"inline\">fakeClientset.AgonesV1().Fleets(ns).Get(...)</code> and checks the mutated field directly (no interception of the <code class=\"inline\">Update()</code> call itself, just re-Get after).</p><p><code class=\"inline\">ScaleFleet</code> implementation itself — <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/agones/fleet.go:136-151</code> — does Get → mutate <code class=\"inline\">fleet.Spec.Replicas</code> → <code class=\"inline\">Update()</code>, returning <code class=\"inline\">ErrFleetNotFound</code> on a 404 from Get. This is the direct template to follow for a new <code class=\"inline\">UpdateFleetTemplate</code>/<code class=\"inline\">ApplyBuild</code>-style method that instead mutates <code class=\"inline\">fleet.Spec.Template</code> (image/command/args) and calls <code class=\"inline\">Update()</code> — same Get-mutate-Update shape, same <code class=\"inline\">ErrFleetNotFound</code> handling.</p><p>## 5. <code class=\"inline\">Launcher.Launch</code> / <code class=\"inline\">launchRegion</code> test</p><p><code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/launcher/launcher_test.go:121-165</code>, <code class=\"inline\">TestLaunch_CreatesFleetAndRecordsClusterID</code>:<br>\u0000FENCE7\u0000<br>Fake router setup: <code class=\"inline\">rt := newFakeRouter()</code>, <code class=\"inline\">euFake := rt.registerRegion(t, db, &quot;eu&quot;)</code> (returns a fake Agones clientset scoped to region &quot;eu&quot;), <code class=\"inline\">l := newLauncher(gamesRepo, tariffsRepo, rt, db)</code> builds the <code class=\"inline\">Launcher</code> with the fake router injected. <code class=\"inline\">TestLaunch_AlreadyLaunchedRegionIsNoOp</code> (<code class=\"inline\">launcher_test.go:363</code>) is likely the closest existing precedent for &quot;region already has a ClusterID&quot; behavior, worth reading directly when designing the new &quot;push to already-launched region&quot; test since it currently asserts the opposite (no-op) of what the new feature needs.</p><p>## 6. <code class=\"inline\">games.Repository</code> region/ClusterID listing</p><p>Type — <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/games/regions.go:27-35</code>:<br>\u0000FENCE8\u0000<br>Lister — <code class=\"inline\">/home/ihar/Games/ludarium/coordinator/internal/coordinator/games/regions.go:74</code> (<code class=\"inline\">func (r *Repository) ListRegions(ctx context.Context, gameID uuid.UUID) ([]GameRegion, error)</code>), already used by <code class=\"inline\">Launch</code> at <code class=\"inline\">launcher.go:270</code> to get all regions and check <code class=\"inline\">region.ClusterID != nil</code> at <code class=\"inline\">launcher.go:296</code> to decide &quot;already launched&quot; vs needs launching. This is exactly the existing mechanism the new &quot;push to launched Fleets&quot; logic would reuse: iterate <code class=\"inline\">ListRegions</code>, and for every region where <code class=\"inline\">ClusterID != nil</code>, resolve the cluster via <code class=\"inline\">l.router.ClusterFor</code> (as <code class=\"inline\">launchRegion</code> does at <code class=\"inline\">launcher.go:306</code>) and call the new Agones update-in-place method instead of <code class=\"inline\">CreateFleet</code>.</p><p>Related helpers also in <code class=\"inline\">regions.go</code>: <code class=\"inline\">SetRegionCluster</code> (<code class=\"inline\">regions.go:112</code>), <code class=\"inline\">CountRegionsByCluster</code> (<code class=\"inline\">regions.go:132</code>), <code class=\"inline\">ClearRegionCluster</code> (<code class=\"inline\">regions.go:145</code>) — no separate &quot;regions-with-cluster&quot; filtered query exists; callers currently always fetch all via <code class=\"inline\">ListRegions</code> and filter client-side in Go (as <code class=\"inline\">Launch</code> does).&lt;/result&gt;<br>&lt;usage&gt;&lt;subagent_tokens&gt;30749&lt;/subagent_tokens&gt;&lt;tool_uses&gt;14&lt;/tool_uses&gt;&lt;duration_ms&gt;92036&lt;/duration_ms&gt;&lt;/usage&gt;<br>&lt;/task-notification&gt;</p>",
+    "ts": "2026-07-13T19:30:28.294Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Good — <code class=\"inline\">s.launcher</code> is already wired in <code class=\"inline\">builds.go</code>&#x27;s handler package. Now writing the final plan.</p>",
+    "ts": "2026-07-13T19:31:26.250Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Starting with the Agones client method.</p>",
+    "ts": "2026-07-13T19:33:08.893Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the tests for it.</p>",
+    "ts": "2026-07-13T19:33:21.079Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Agones layer done. Moving to the launcher.</p>",
+    "ts": "2026-07-13T19:33:46.576Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Compiles clean. Now let&#x27;s fix the stale package doc comment that says rolling updates are out of scope, and add the launcher tests.</p>",
+    "ts": "2026-07-13T19:35:08.293Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the launcher tests. Let me look at test file setup helpers (<code class=\"inline\">newFakeRouter</code>, <code class=\"inline\">registerRegion</code>, <code class=\"inline\">newLauncher</code>) to write matching tests.</p>",
+    "ts": "2026-07-13T19:35:17.638Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now I&#x27;ll add the RolloutActiveBuild tests right after <code class=\"inline\">TestLaunch_AlreadyLaunchedRegionIsNoOp</code>.</p>",
+    "ts": "2026-07-13T19:35:38.195Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All launcher tests pass. Now dashboardapi wiring.</p>",
+    "ts": "2026-07-13T19:36:10.185Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Good, this matches embedding cleanly. Now add the response type and update the handler.</p>",
+    "ts": "2026-07-13T19:36:23.845Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Compiles. Now let&#x27;s find the existing test and add the rollout test, plus check <code class=\"inline\">writeDomainError</code>/error mapping for launcher errors used in this handler already elsewhere for consistency.</p>",
+    "ts": "2026-07-13T19:36:57.683Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Good, existing test decoding is unaffected. Now let&#x27;s add a dedicated rollout test after <code class=\"inline\">TestActivateBuild_SetsActive</code>.</p>",
+    "ts": "2026-07-13T19:37:10.970Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Need to add the <code class=\"inline\">encoding/json</code> import.</p>",
+    "ts": "2026-07-13T19:37:23.273Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Free tariff caps buffer at 0. Fix by using <code class=\"inline\">buffer_size: 0</code> (matches the sibling test pattern).</p>",
+    "ts": "2026-07-13T19:38:26.644Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now let&#x27;s run the full dashboardapi/builds test suite to confirm nothing else broke, then move to UI.</p>",
+    "ts": "2026-07-13T19:38:42.587Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the UI copy fix.</p>",
+    "ts": "2026-07-13T19:39:08.321Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>No test references the old copy. Now updating PROJECT_MAP.md risk #8.</p>",
+    "ts": "2026-07-13T19:39:36.893Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Now the final full verification pass — Go tests, build check, and UI test/build.</p>",
+    "ts": "2026-07-13T19:39:59.964Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Full <code class=\"inline\">go test ./...</code> passes. Now the UI build/test check since <code class=\"inline\">en.ts</code> changed.</p>",
+    "ts": "2026-07-13T19:40:26.425Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All 106 UI tests pass.</p>",
+    "ts": "2026-07-13T19:40:33.781Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Clean. Everything checks out.</p>",
+    "ts": "2026-07-13T19:40:43.364Z"
   }
 ]
