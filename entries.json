@@ -19985,5 +19985,17 @@
     "who": "claude",
     "html": "<p>Все 8 тестов проходят. Прогоню весь фронт целиком.</p>",
     "ts": "2026-07-13T18:56:51.499Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Только преэкзистентная проблема (не связана с этой правкой). Итог:</p><p>**Убрано из <code class=\"inline\">DeployStatusWidget.tsx</code> (виджет &quot;Deployment by region&quot;):**<br>- <code class=\"inline\">GameServerRow</code> со всем содержимым: имя пода, ip:port, бейджи <code class=\"inline\">match_started</code>/<code class=\"inline\">players_connected</code>, dev-кнопки <code class=\"inline\">sim: start/join/leave/end match</code>.<br>- Live-tail логов конкретного инстанса (<code class=\"inline\">logsFor</code>/<code class=\"inline\">LogDrawer</code> для инстанса) и мутация <code class=\"inline\">simulate</code>.<br>- Точный per-instance расчёт &quot;in match&quot; (<code class=\"inline\">match_started || Allocated</code>) — заменён на прямой <code class=\"inline\">data.allocated_replicas</code> с бэкенда (комментарий фиксирует потерю точности для <code class=\"inline\">lobby_mode=server</code>/dev-симулятора — это осознанный компромисс за счёт удаления списка).</p><p>**Осталось:** сводка desired/ready/in match по региону, статус &quot;not launched&quot;, dev-кнопка &quot;sim: player session&quot; (для пустого флота) — её условие видимости пересчитано без <code class=\"inline\">game_servers.length</code>, теперь через сводные счётчики.</p><p>**Почищено вместе с этим:**<br>- Тип <code class=\"inline\">GameServerStatus</code> и поле <code class=\"inline\">game_servers</code> — из <code class=\"inline\">api/types.ts</code>.<br>- 7 неиспользуемых i18n-ключей (<code class=\"inline\">deploy.simStart/simJoin/simLeave/simClose/playersConnected/imagePullHint/portMismatch</code>) — оставлены <code class=\"inline\">deploy.matchStarted</code>/<code class=\"inline\">deploy.instanceLogs</code> (переиспользуются в <code class=\"inline\">MonitoringTab.tsx</code>).<br>- <code class=\"inline\">describeServerState</code>/<code class=\"inline\">toneClass</code> — импорт убран из этого файла (сами функции остаются, используются в <code class=\"inline\">MonitoringTab.tsx</code>/<code class=\"inline\">TestInstancePanel.tsx</code>).<br>- Тесты <code class=\"inline\">OverviewTab.test.tsx</code>: убраны все, специфичные для списка инстансов деплоя (7 тестов), оставлен/адаптирован тест на dev-кнопку &quot;sim: player session&quot;.</p><p><code class=\"inline\">tsc</code>, <code class=\"inline\">vite build</code> и весь vitest-набор (106 тестов) — чисто. Go-бэкенд не трогал (эндпоинты <code class=\"inline\">/status</code>, <code class=\"inline\">/simulate</code> и т.д. остаются — эта уборка была именно про фронт).</p><p>Не смог проверить визуально в браузере (нет инструмента для скриншотов в этой среде) — полагаюсь на чистые <code class=\"inline\">tsc</code>/<code class=\"inline\">build</code>/тесты; если что-то визуально не так, дай знать.</p>",
+    "ts": "2026-07-13T18:58:26.770Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>все чотко , спасибо</p>",
+    "ts": "2026-07-13T18:59:44.465Z"
   }
 ]
