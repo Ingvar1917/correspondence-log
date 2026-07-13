@@ -17819,5 +17819,23 @@
     "who": "claude",
     "html": "<p>Понял, спасибо за уточнение — это разные оси: «не спешить» про качество решений (не срезать углы), а не про то, сколько часов подряд сидеть. Раз сидишь долго потому что затягивает интерес к своему стартапу, а не потому что дедлайн жмёт — это не то, на что мне стоило указывать как на риск. Учту.</p>",
     "ts": "2026-07-13T02:01:06.990Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновил память — больше не буду поднимать длительность сессии как повод притормозить, это отдельная от «не срезать углы» ось.</p>",
+    "ts": "2026-07-13T02:01:23.987Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>Привет, что за контейнеры coordinator-asia-control-plane coordinator-asia-worker ?</p>",
+    "ts": "2026-07-13T10:19:42.686Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Это два узла <code class=\"inline\">kind</code>-кластера (Kubernetes-в-Docker) с именем **<code class=\"inline\">coordinator-asia</code>** — <code class=\"inline\">coordinator-asia-control-plane</code> (control-plane, API-сервер проброшен на <code class=\"inline\">127.0.0.1:42017→6443</code>) и <code class=\"inline\">coordinator-asia-worker</code>. Создан 43 часа назад, судя по <code class=\"inline\">kind get clusters</code> — реально существует наравне с <code class=\"inline\">coordinator-dev</code> и <code class=\"inline\">coordinator-agones-e2e</code>.</p><p>Важный момент: в <code class=\"inline\">cluster_registry</code> (БД coordinator&#x27;а) для региона <code class=\"inline\">asia</code> **нет ни одной строки** — то есть физически кластер жив, а coordinator о нём вообще не знает и никуда через него не маршрутизирует. Это в точности сценарий из <code class=\"inline\">WHATIF.md</code> («админ перепровиживает регион, чей кластер раньше был <code class=\"inline\">deleted</code>») — там описан именно <code class=\"inline\">coordinator-asia</code>, оставшийся сиротой после неудачной попытки провижининга 2026-07-08 через <code class=\"inline\">KindAdapter</code> (имя <code class=\"inline\">&quot;coordinator-&quot;+region</code>, дефолт из <code class=\"inline\">Manager.Launch</code>/dev-stack provisioning-демо для admin-панели, регионы <code class=\"inline\">eu</code>/<code class=\"inline\">us</code>/<code class=\"inline\">asia</code>).</p><p>Раз он не зарегистрирован и не используется — это чистый мусор от того теста/прошлой сессии, просто пережил рестарт Docker (containers &quot;Up 4 minutes&quot; при возрасте 43ч). Снести можно <code class=\"inline\">kind delete cluster --name coordinator-asia</code>, если он тебе не нужен — сам решай, я не трогал.</p>",
+    "ts": "2026-07-13T10:20:27.111Z"
   }
 ]
