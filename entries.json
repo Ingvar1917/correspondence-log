@@ -18563,5 +18563,17 @@
     "who": "ihar",
     "html": "<p>при отключении pull-through cache нужен ли каким то сервисам перезапуск?</p>",
     "ts": "2026-07-13T13:58:00.302Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хороший, конкретный вопрос — и тут ответ приятный: **сам containerd перезапускать не нужно**, но кое-что явно убрать придётся руками (точнее, самим <code class=\"inline\">DaemonSet</code>).</p><p>**Почему containerd не требует рестарта.** <code class=\"inline\">hosts.toml</code>-конфиг (тот самый, современный способ настройки mirror&#x27;ов, который мы выбрали, а не старый <code class=\"inline\">config.toml</code>) containerd перечитывает **на каждый pull**, а не один раз при своём старте. Это специально так устроено — раньше (старый способ через <code class=\"inline\">config.toml</code>) правки в конфиг реально требовали рестарта containerd, <code class=\"inline\">hosts.toml</code>-подход как раз и придумали, чтобы от этого уйти. Значит: убрали файл — следующий же pull просто не найдёт mirror и молча пойдёт напрямую в центральный registry, без ошибок и без даунтайма.</p><p>**Что реально нужно сделать руками.** Удаление <code class=\"inline\">Deployment</code>/<code class=\"inline\">Service</code>/<code class=\"inline\">DaemonSet</code> из кластера **само по себе не стирает файл <code class=\"inline\">hosts.toml</code>**, который <code class=\"inline\">DaemonSet</code> записал на диск ноды через <code class=\"inline\">hostPath</code> — это обычный файл на файловой системе ноды, он не привязан к жизни пода, который его туда положил. Если просто снести <code class=\"inline\">DaemonSet</code>, на нодах останется мёртвый конфиг, указывающий на уже несуществующий <code class=\"inline\">Service</code> — новые pull&#x27;ы будут пытаться постучаться в кэш, получать отказ, и только потом (по логике fallback в <code class=\"inline\">hosts.toml</code>) идти в настоящий registry — не критично, но лишняя задержка и шум в логах. Поэтому в сам <code class=\"inline\">DaemonSet</code> нужен явный шаг очистки (<code class=\"inline\">preStop</code>-хук в поде) — стереть/переписать <code class=\"inline\">hosts.toml</code>, убирая mirror, именно в момент, когда <code class=\"inline\">DaemonSet</code> сносится, а не полагаться, что Kubernetes сам это уберёт.</p><p>**Что вообще не затрагивается**: уже работающие GameServer-поды — они давно скачали свои образы, им вообще всё равно, жив кэш или нет.</p><p>Так что единственное, что нужно добавить в сценарий <code class=\"inline\">DELETE /admin/clusters/{id}/cache</code> — явную очистку <code class=\"inline\">hosts.toml</code> в самом <code class=\"inline\">DaemonSet</code>, а не просто удаление объектов. Зафиксировать это уточнение в карте рядом с остальным?</p>",
+    "ts": "2026-07-13T13:58:34.991Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>да</p>",
+    "ts": "2026-07-13T13:59:53.380Z"
   }
 ]
