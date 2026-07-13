@@ -26639,5 +26639,257 @@
     "who": "claude",
     "html": "<p>Готово. Убрал тарифные лимиты на буфер и число регионов — теперь это регулируется только балансом юнитов, а не жёстким тарифным потолком:</p><p>**Бэкенд:**<br>- <code class=\"inline\">handleUpsertRegion</code> (dashboardapi) — убрана вся проверка <code class=\"inline\">buffer_min/buffer_max</code>/<code class=\"inline\">max_regions</code> тарифа; единственная защита — <code class=\"inline\">buffer_size &gt;= 0</code> в <code class=\"inline\">games.UpsertRegion</code> (как и раньше).<br>- <code class=\"inline\">tariffs.Tariff</code> / DTO — поля <code class=\"inline\">BufferMin/BufferMax/MaxRegions</code> убраны.<br>- Миграция <code class=\"inline\">000053</code> дропает колонки <code class=\"inline\">tariffs.buffer_min/buffer_max/max_regions</code> — применил её и на живом dev-кластере (кластер <code class=\"inline\">coordinator-dev</code>), заодно поправил <code class=\"inline\">schema_migrations</code>, чтобы <code class=\"inline\">make dev-up</code>/миграционный Job её не переигрывал.</p><p>**Фронтенд (<code class=\"inline\">RegionsSection.tsx</code>):** буфер теперь всегда редактируемый инпут (не текст), форма добавления региона видна всегда — никакого «Your tariff allows up to N region(s)».</p><p>**Тесты:** <code class=\"inline\">TestUpsertRegion_EnforcesTariffBufferRange</code>/<code class=\"inline\">...RegionLimit</code> заменены на <code class=\"inline\">TestUpsertRegion_NoTariffBufferOrRegionLimit</code> (доказывает, что free-тариф теперь принимает buffer=5 и второй регион); аналогично на фронте. Полный <code class=\"inline\">go test ./...</code> и <code class=\"inline\">npm run test</code>/<code class=\"inline\">tsc -b</code>/<code class=\"inline\">vite build</code> — зелёные.</p><p>**Документация:** <code class=\"inline\">PROJECT_MAP.md</code> обновлён (п.12 units + старая тарифная секция помечена superseded).</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
     "ts": "2026-07-13T22:33:31.637Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>в eu тоже должен быть 1 инстанс ready, по ходу нужен отдельный registry контейнер что бы оба кластера к нему обращались за образами</p>",
+    "ts": "2026-07-13T22:36:19.301Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Диагноз подтвердился — под в <code class=\"inline\">eu</code> реально висит в <code class=\"inline\">ImagePullBackOff</code>:</p>",
+    "ts": "2026-07-13T22:38:29.569Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Причина ровно как вы и предположили, только вдвойне:</p><p>1. **Образ игры** (<code class=\"inline\">registry.coordinator.svc.cluster.local:5000/game-...</code>) — это Kubernetes Service DNS-имя, оно резолвится только *внутри* кластера <code class=\"inline\">coordinator-dev</code>. Нода кластера <code class=\"inline\">eu</code> вообще не может его разрешить: <code class=\"inline\">lookup registry.coordinator.svc.cluster.local on 172.24.0.1:53: server misbehaving</code>.<br>2. **<code class=\"inline\">bridge-sidecar:dev</code>** — это локальный tag, который <code class=\"inline\">make dev-up</code> грузит в containerd <code class=\"inline\">coordinator-dev</code> через <code class=\"inline\">kind load docker-image</code>. В <code class=\"inline\">eu</code> его просто никогда не было — kubelet пытается тянуть его с Docker Hub и получает <code class=\"inline\">pull access denied</code>.</p><p>Важно: это не новый баг, а уже описанный в PROJECT_MAP.md пробел («pull-through cache per-регион», обсуждался 2026-07-13, помечен как **дизайн, не реализовано**) — сейчас v1 архитектуры сознательно один registry в системном кластере, и межкластерный pull ещё не построен. Оба кластера (<code class=\"inline\">dev</code>, <code class=\"inline\">eu</code>) физически сидят в одной docker-сети <code class=\"inline\">kind</code> (172.24.0.0/16), так что сетевая связность есть — не хватает только доставки образов.</p><p>Тут два разных по объёму пути:</p>",
+    "ts": "2026-07-13T22:38:41.550Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Старый план — уже сделанная фича (rollout билда). Задача новая, полностью перезаписываю файл.</p>",
+    "ts": "2026-07-13T22:44:19.357Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Отлично, паттерн понятен. Начинаю с миграции.</p>",
+    "ts": "2026-07-13T22:46:37.218Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, gofmt поправил выравнивание. Теперь пишу тесты для <code class=\"inline\">registrycache</code>.</p>",
+    "ts": "2026-07-13T22:49:33.513Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хороший образец — использую тот же паттерн <code class=\"inline\">seedCluster</code> для FK на <code class=\"inline\">cluster_registry</code>.</p>",
+    "ts": "2026-07-13T22:49:39.080Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Репозиторий проходит. Теперь тесты для <code class=\"inline\">installer.go</code> на fake-клиентсете.</p>",
+    "ts": "2026-07-13T22:50:06.000Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все зелёное. Дальше — интеграция с <code class=\"inline\">admindashboard</code>.</p>",
+    "ts": "2026-07-13T22:51:06.825Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь смотрю <code class=\"inline\">handleDeleteCluster</code> и <code class=\"inline\">writeError</code>/<code class=\"inline\">decodeJSON</code>/<code class=\"inline\">writeDomainError</code> определения для консистентности:</p>",
+    "ts": "2026-07-13T22:51:20.853Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ясно, добавлю <code class=\"inline\">registrycache.ErrCacheNotFound</code> в маппинг. Теперь смотрю <code class=\"inline\">dto.go</code> для стиля view-структур:</p>",
+    "ts": "2026-07-13T22:51:29.250Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо — сейчас добавлю view-структуры, которые используют этот импорт.</p>",
+    "ts": "2026-07-13T22:51:50.383Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">server.go</code> — интерфейс, поля, конструктор, роуты:</p>",
+    "ts": "2026-07-13T22:52:03.642Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю роуты:</p>",
+    "ts": "2026-07-13T22:52:27.415Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ожидаемо. Пишу сами хендлеры в <code class=\"inline\">handlers.go</code>, рядом с <code class=\"inline\">handleScaleFleet</code>.</p>",
+    "ts": "2026-07-13T22:52:36.089Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю маппинг <code class=\"inline\">registrycache.ErrCacheNotFound</code> в <code class=\"inline\">errors.go</code>:</p>",
+    "ts": "2026-07-13T22:53:27.524Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь проверяю компиляцию пакета:</p>",
+    "ts": "2026-07-13T22:53:49.234Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Обновляю <code class=\"inline\">handlers_test.go</code> (constructor call) и добавляю fake installer + тесты.</p>",
+    "ts": "2026-07-13T22:53:53.092Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Ясная схема. Пишу тесты для cache-хендлеров сразу после блока <code class=\"inline\">TestScaleFleet_*</code>.</p>",
+    "ts": "2026-07-13T22:54:54.463Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь запускаю тесты этого пакета:</p>",
+    "ts": "2026-07-13T22:55:22.612Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Как ожидалось — теперь <code class=\"inline\">wiring.go</code>.</p>",
+    "ts": "2026-07-13T22:55:26.309Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё компилируется. Прогоняю тесты <code class=\"inline\">admindashboard</code>.</p>",
+    "ts": "2026-07-13T22:55:53.152Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>All 7 новых теста прошли. Прогоняю полный пакет <code class=\"inline\">admindashboard</code> и весь <code class=\"inline\">go build ./... &amp;&amp; go vet ./...</code>.</p>",
+    "ts": "2026-07-13T22:56:06.861Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто. Полный прогон тестов (не <code class=\"inline\">-short</code>, т.к. меняется схема данных):</p>",
+    "ts": "2026-07-13T22:56:33.727Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Порт-форвард работает. Пишу временную debug-программу для живой проверки.</p>",
+    "ts": "2026-07-13T22:58:00.730Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Сначала применяю миграцию 000054 к живой БД dev-кластера.</p>",
+    "ts": "2026-07-13T22:58:07.284Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Подтверждено: NodePort 30500. Запускаю деплой кэша на кластер <code class=\"inline\">eu</code>.</p>",
+    "ts": "2026-07-13T22:59:03.739Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Деплой прошёл успешно. Проверяю живое состояние на кластере <code class=\"inline\">eu</code>.</p>",
+    "ts": "2026-07-13T22:59:27.230Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все объекты подняты. Жду, пока registry-cache под станет Ready, и проверяю hosts.toml на ноде.</p>",
+    "ts": "2026-07-13T22:59:32.568Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё как задумано. Теперь проверяю, ушёл ли уже существующий (зависший в <code class=\"inline\">ImagePullBackOff</code>) под игры в <code class=\"inline\">Ready</code>, и при необходимости пересоздаю его.</p>",
+    "ts": "2026-07-13T23:00:03.266Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Agones пересоздал GameServer с новым подом. Слежу за статусом.</p>",
+    "ts": "2026-07-13T23:00:27.164Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Прогресс — не <code class=\"inline\">ImagePullBackOff</code>, а <code class=\"inline\">PodInitializing</code>. Жду ещё немного.</p>",
+    "ts": "2026-07-13T23:00:44.848Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Живая проверка поймала реальный баг: containerd работает в сетевом namespace **ноды**, а не пода, поэтому Service DNS-имя (<code class=\"inline\">registry-cache.registry-cache.svc.cluster.local</code>) ему тоже недоступно — нужен ClusterIP, как и в <code class=\"inline\">setup-dev-extras.sh</code>. Исправляю.</p>",
+    "ts": "2026-07-13T23:01:25.670Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь обновляю саму проверку <code class=\"inline\">wantLocalURL</code>:</p>",
+    "ts": "2026-07-13T23:02:43.648Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Тесты снова зелёные с правильным поведением. Теперь пересобираю debug-бинарь с фиксом и передеплою кэш на <code class=\"inline\">eu</code>.</p>",
+    "ts": "2026-07-13T23:03:02.722Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Новый под мирорра поднялся. Проверяю hosts.toml.</p>",
+    "ts": "2026-07-13T23:03:47.564Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь указывает на реальный ClusterIP. Пересоздаю под игры и слежу за статусом.</p>",
+    "ts": "2026-07-13T23:03:51.170Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Port-forward и временный debug-инструмент убраны. Обновляю статус тудушек и финальный прогон тестов/сборки.</p>",
+    "ts": "2026-07-13T23:05:19.453Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё зелёное. Обновляю PROJECT_MAP.md и WHATIF.md.</p>",
+    "ts": "2026-07-13T23:05:40.288Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь добавляю строку в WHATIF.md.</p>",
+    "ts": "2026-07-13T23:07:09.864Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю новую строку в конец таблицы.</p>",
+    "ts": "2026-07-13T23:07:24.033Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё чисто, файлы на месте. Фича полностью готова и проверена живьём.</p><p>## Итог</p><p>Реализован pull-through registry cache per-кластер (план <code class=\"inline\">concurrent-gathering-prism.md</code>):</p><p>- **<code class=\"inline\">internal/coordinator/registrycache</code>** — новый пакет: <code class=\"inline\">Repository</code> (одна строка на кластер в <code class=\"inline\">cluster_cache</code>, миграция <code class=\"inline\">000054</code>) + <code class=\"inline\">Installer</code> (чистый client-go, без helm: <code class=\"inline\">Deployment</code>/<code class=\"inline\">Service</code>/<code class=\"inline\">DaemonSet</code>, DaemonSet пишет <code class=\"inline\">hosts.toml</code> на нодах).<br>- **<code class=\"inline\">admindashboard</code>**: <code class=\"inline\">POST/GET/PATCH/DELETE /clusters/{id}/cache</code> — деплой/статус/ресайз/снос, синхронно (не async-job).<br>- Тесты: fake-clientset для <code class=\"inline\">registrycache</code>, fake-installer для <code class=\"inline\">admindashboard</code>, полный <code class=\"inline\">go test ./...</code> зелёный.<br>- **Живой прогон на реальных <code class=\"inline\">coordinator-dev</code>+<code class=\"inline\">coordinator-eu</code>**: после деплоя кэша тенантский образ игры в <code class=\"inline\">eu</code> спуллился за ~1с (было — вечный <code class=\"inline\">ImagePullBackOff</code>).<br>- Живьём же поймал баг, который не поймал ни один fake-тест: containerd живёт в netns **ноды**, а не пода, поэтому DNS-имя даже своего локального Service не резолвит — <code class=\"inline\">hosts.toml</code> должен указывать на ClusterIP. Исправлено в коде и в тесте.<br>- <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">WHATIF.md</code> обновлены.</p><p>**Отдельно найден, но не закрыт** новый пробел: <code class=\"inline\">bridge-sidecar:dev</code> — это не тенантский образ, а голый <code class=\"inline\">kind load</code>-тег без адреса registry вовсе, кэш ему ничем не помогает. Из-за этого под в <code class=\"inline\">eu</code> всё ещё не доходит до полного <code class=\"inline\">Ready</code> (2/3 контейнеров). Чинить сейчас (запушить <code class=\"inline\">bridge-sidecar</code>/<code class=\"inline\">build-unpacker</code> в тот же центральный registry и поменять <code class=\"inline\">BRIDGE_SIDECAR_IMAGE</code>) — или оставить как отдельную задачу на потом?</p>",
+    "ts": "2026-07-13T23:08:15.956Z"
   }
 ]
