@@ -18197,5 +18197,17 @@
     "who": "claude",
     "html": "<p>Два разных слоя ставятся на ноду:</p><p>**1. Один раз, сразу после создания кластера** (<code class=\"inline\">Manager.finish</code> → <code class=\"inline\">InstallAgones</code>, через Helm) — это то, что мы называли &quot;инфрой&quot;: системные компоненты самого Kubernetes (<code class=\"inline\">kube-proxy</code>, CNI) + сам Agones (<code class=\"inline\">agones-controller</code>, <code class=\"inline\">agones-allocator</code>, <code class=\"inline\">agones-ping</code>). Это ставится независимо от того, есть ли хоть одна игра.</p><p>**2. На каждый запуск игры** — Fleet создаёт под, и в этом поде реально **три контейнера**, не один:</p>",
     "ts": "2026-07-13T11:15:34.452Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Явно в коде coordinator&#x27;а описаны два контейнера:<br>- **<code class=\"inline\">game</code>** — образ индюка (тот код, которому мы не доверяем).<br>- **<code class=\"inline\">bridge-sidecar</code>** — наш собственный компонент, транслирует HTTP-запросы (player count, match-started) в вызовы Agones SDK.</p><p>Плюс **третий контейнер, которого нет в этом коде вообще** — сам Agones **автоматически** инжектит собственный SDK-сайдкар в каждый GameServer-под через свой mutating webhook при создании пода (это поведение самого Agones-контроллера, не что-то, что coordinator описывает явно). Через него <code class=\"inline\">game</code>-контейнер общается с Agones (Ready/Health/Allocate).</p><p>Итого на ноде, где живёт хотя бы одна игра: <code class=\"inline\">kube-proxy</code>+CNI (системное), <code class=\"inline\">agones-controller</code>/<code class=\"inline\">allocator</code>/<code class=\"inline\">ping</code> (управление, из шага 1), и на каждый под игры — <code class=\"inline\">game</code> + <code class=\"inline\">bridge-sidecar</code> + Agones SDK-сайдкар (по три контейнера на каждую реплику Fleet&#x27;а).</p>",
+    "ts": "2026-07-13T11:15:47.676Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>и сколько времени требуется что поднятия свежей ноды которая сможет принимать флиты?</p>",
+    "ts": "2026-07-13T11:17:08.367Z"
   }
 ]
