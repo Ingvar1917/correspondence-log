@@ -26441,5 +26441,203 @@
     "who": "claude",
     "html": "<p>Аккаунт <code class=\"inline\">d@d.d2</code> (единственный в dev-кластере) теперь paid: добавил реальную topup-транзакцию (<code class=\"inline\">delta=36000</code> unit-seconds, <code class=\"inline\">+10</code> unit-часов к балансу) — <code class=\"inline\">units.HasTopUp</code> теперь возвращает <code class=\"inline\">true</code>, статус paid навсегда (по дизайну, гранты его не дают, только topup). Баланс на счету: 577049 unit-секунд.</p>",
     "ts": "2026-07-13T22:17:04.024Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>должна быть возможность менять буфер и добавлять разные регионы</p>",
+    "ts": "2026-07-13T22:18:51.035Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>[Request interrupted by user for tool use]</p>",
+    "ts": "2026-07-13T22:20:53.283Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>мы ведь ушли от тарифов. у нас только units, можно даже на бесплатном менять буфер и выбирать разные регионы</p>",
+    "ts": "2026-07-13T22:21:06.201Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, <code class=\"inline\">games.UpsertRegion</code> уже сам проверяет <code class=\"inline\">buffer_size &gt;= 0</code> на уровне репозитория — значит убирать тарифные лимиты можно, не теряя базовую защиту от мусорного ввода. Собираю план и приступаю.</p>",
+    "ts": "2026-07-13T22:22:25.474Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь смотрю тест SettingsTab.test.tsx на использование этих полей и RegionsSection.test.tsx (если есть отдельный).</p>",
+    "ts": "2026-07-13T22:23:00.891Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь вношу изменения. Сначала бэкенд-обработчик:</p>",
+    "ts": "2026-07-13T22:23:58.543Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, <code class=\"inline\">fmt</code> всё ещё используется в других местах файла. Теперь DTO:</p>",
+    "ts": "2026-07-13T22:24:16.155Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">tariffs.Tariff</code> и репозиторий:</p>",
+    "ts": "2026-07-13T22:24:26.088Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю SQL/scan в <code class=\"inline\">ListAll</code>/<code class=\"inline\">GetByID</code>.</p>",
+    "ts": "2026-07-13T22:24:34.076Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь миграция, которая дропает столбцы:</p>",
+    "ts": "2026-07-13T22:25:03.055Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь фронтенд. Обновляю <code class=\"inline\">RegionsSection.tsx</code>, убирая тарифную логику буфера/лимита регионов:</p>",
+    "ts": "2026-07-13T22:25:21.080Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь остальная часть компонента, где использовались <code class=\"inline\">bufferMin/bufferMax/bufferFixed/limitReached</code>:</p>",
+    "ts": "2026-07-13T22:25:37.257Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь убираю неиспользуемый ключ <code class=\"inline\">regions.limitReached</code> из словаря и типы <code class=\"inline\">Tariff</code> (buffer_min/buffer_max/max_regions):</p>",
+    "ts": "2026-07-13T22:26:02.244Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь i18n-строки:</p>",
+    "ts": "2026-07-13T22:26:18.292Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, в админке этого нет. Теперь <code class=\"inline\">types.ts</code>:</p>",
+    "ts": "2026-07-13T22:26:30.813Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь фронтенд-тесты <code class=\"inline\">SettingsTab.test.tsx</code>. Прохожусь по ним и обновляю под новое поведение (без тарифных ограничений буфера/регионов):</p>",
+    "ts": "2026-07-13T22:26:47.488Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>This test is redundant now with my new &quot;free-тариф&quot; test. Simplify it to drop the tariff override (no longer meaningful) and fix the stale comment:</p>",
+    "ts": "2026-07-13T22:27:22.219Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>TypeScript чисто. Теперь бэкенд-тесты:</p>",
+    "ts": "2026-07-13T22:27:43.798Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Точно, я всё ещё в <code class=\"inline\">dashboardui</code> после <code class=\"inline\">cd</code>. Возвращаюсь в корень.</p>",
+    "ts": "2026-07-13T22:27:50.481Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Заменяю оба теста на один, проверяющий, что тарифных ограничений больше нет:</p>",
+    "ts": "2026-07-13T22:27:53.144Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 10 вхождений идентичны — заменю разом через <code class=\"inline\">replace_all</code>:</p>",
+    "ts": "2026-07-13T22:28:41.409Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь <code class=\"inline\">TestRegions_UpsertListRemove</code> и <code class=\"inline\">TestRegions_RejectsSecondBaseRegion</code> — там переключение тарифа больше не нужно:</p>",
+    "ts": "2026-07-13T22:28:48.135Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Хорошо, тесты <code class=\"inline\">tariffs</code> не трогают эти поля. Проверяю остальные вхождения по всему репо, которые могли остаться:</p>",
+    "ts": "2026-07-13T22:29:14.349Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Чисто. Теперь прогоняю сборку и тесты бэкенда:</p>",
+    "ts": "2026-07-13T22:29:20.186Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Сборка чистая. Теперь проверю vet/тесты (используя <code class=\"inline\">-short</code> для быстрой проверки компиляции пакетов, а полный прогон — отдельно, т.к. меняется семантика данных):</p>",
+    "ts": "2026-07-13T22:29:27.951Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все затронутые пакеты проходят полным прогоном (с настоящим Postgres, миграцией новой 000053 включительно). Прогоняю весь набор для полноты:</p>",
+    "ts": "2026-07-13T22:29:57.879Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Полный <code class=\"inline\">go test ./...</code> зелёный. Теперь фронтенд:</p>",
+    "ts": "2026-07-13T22:30:10.023Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Все 109 тестов зелёные. Проверю сборку фронтенда целиком:</p>",
+    "ts": "2026-07-13T22:30:20.398Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Обновляю PROJECT_MAP.md — это часть definition of done по CLAUDE.md.</p>",
+    "ts": "2026-07-13T22:31:35.458Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Действительно продублировал строку 19/20. Убираю дубликат:</p>",
+    "ts": "2026-07-13T22:32:06.785Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Дубликат убран. Теперь строка 576 про &quot;базовый регион включён в тариф, остальные — платная доп. позиция&quot;:</p>",
+    "ts": "2026-07-13T22:32:27.067Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Добавляю пункт про снятие лимитов в конец списка этапа 2, рядом с описанием других &quot;хвостов&quot;:</p>",
+    "ts": "2026-07-13T22:33:00.349Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Готово. Убрал тарифные лимиты на буфер и число регионов — теперь это регулируется только балансом юнитов, а не жёстким тарифным потолком:</p><p>**Бэкенд:**<br>- <code class=\"inline\">handleUpsertRegion</code> (dashboardapi) — убрана вся проверка <code class=\"inline\">buffer_min/buffer_max</code>/<code class=\"inline\">max_regions</code> тарифа; единственная защита — <code class=\"inline\">buffer_size &gt;= 0</code> в <code class=\"inline\">games.UpsertRegion</code> (как и раньше).<br>- <code class=\"inline\">tariffs.Tariff</code> / DTO — поля <code class=\"inline\">BufferMin/BufferMax/MaxRegions</code> убраны.<br>- Миграция <code class=\"inline\">000053</code> дропает колонки <code class=\"inline\">tariffs.buffer_min/buffer_max/max_regions</code> — применил её и на живом dev-кластере (кластер <code class=\"inline\">coordinator-dev</code>), заодно поправил <code class=\"inline\">schema_migrations</code>, чтобы <code class=\"inline\">make dev-up</code>/миграционный Job её не переигрывал.</p><p>**Фронтенд (<code class=\"inline\">RegionsSection.tsx</code>):** буфер теперь всегда редактируемый инпут (не текст), форма добавления региона видна всегда — никакого «Your tariff allows up to N region(s)».</p><p>**Тесты:** <code class=\"inline\">TestUpsertRegion_EnforcesTariffBufferRange</code>/<code class=\"inline\">...RegionLimit</code> заменены на <code class=\"inline\">TestUpsertRegion_NoTariffBufferOrRegionLimit</code> (доказывает, что free-тариф теперь принимает buffer=5 и второй регион); аналогично на фронте. Полный <code class=\"inline\">go test ./...</code> и <code class=\"inline\">npm run test</code>/<code class=\"inline\">tsc -b</code>/<code class=\"inline\">vite build</code> — зелёные.</p><p>**Документация:** <code class=\"inline\">PROJECT_MAP.md</code> обновлён (п.12 units + старая тарифная секция помечена superseded).</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-13T22:33:31.637Z"
   }
 ]
