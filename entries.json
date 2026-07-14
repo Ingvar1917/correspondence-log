@@ -27143,5 +27143,71 @@
     "who": "claude",
     "html": "<p>Всё чисто.</p><p>## Итог</p><p>Три бага в итоге, все проверены живьём:</p><p>1. **Bridge-sidecar** — образ теперь идёт через центральный registry + pull-through cache, <code class=\"inline\">eu</code> получил <code class=\"inline\">Ready</code> GameServer.<br>2. **Кубеконфиг <code class=\"inline\">eu</code> адресован <code class=\"inline\">127.0.0.1</code>** — не резолвится из пода координатора. <code class=\"inline\">KindAdapter.GetKubeconfig</code> теперь берёт <code class=\"inline\">kind get kubeconfig --internal</code> и подменяет Docker-хостнейм на реальный IP control-plane контейнера — единственный адрес, работающий одинаково и с хоста, и из пода другого kind-кластера. Проверено живьём **со строгой TLS-валидацией** с обеих сторон. Живая запись <code class=\"inline\">eu</code> в БД перешифрована; после рестарта <code class=\"inline\">deployment/app</code> watch-циклы для <code class=\"inline\">eu</code> больше не логируют ошибок.<br>3. **Попутно найден и закрыт race в <code class=\"inline\">provisioning.Manager</code>** (не связан с кубеконфигом, всплыл при верификации через <code class=\"inline\">test-e2e-provisioning</code>): фикс от 07-13 «job пишется до <code class=\"inline\">CreateCluster</code>» открыл окно, где фоновый поллер видит job с пустым <code class=\"inline\">external_cluster_id</code> и детерминированно (не флейково) фейлит его — <code class=\"inline\">KindAdapter.GetCluster(&quot;&quot;)</code> отвечает не Go-ошибкой, а валидным <code class=\"inline\">ClusterStateError</code>. Тест был сломан на 100% с 07-13, просто не перегонялся живьём. Исправлено — <code class=\"inline\">advance()</code> пропускает job с пустым ID.<br>4. **Бонус**: холодный <code class=\"inline\">go test ./...</code> вскрыл стухший тест в <code class=\"inline\">dashboardevents</code> (свой рукописный <code class=\"inline\">ON CONFLICT</code>, не обновлённый под партиальный индекс 000052) — поправлен.</p><p>Живой <code class=\"inline\">test-e2e-provisioning</code> (create→ready→drain→delete на реальном kind-кластере) — <code class=\"inline\">PASS</code>, дважды подряд. Полный <code class=\"inline\">go test ./...</code> с холодным кэшем — зелёный. <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">WHATIF.md</code> обновлены, все временные debug-инструменты удалены.</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
     "ts": "2026-07-13T23:53:41.057Z"
+  },
+  {
+    "type": "msg",
+    "who": "ihar",
+    "html": "<p>2026/07/14 01:56:47 [provisioning] job 9be8ab46-7908-4f82-8e21-e3231ba95fff failed: install agones: helm install agones: exit status 1: level=ERROR msg=&quot;release name check failed&quot; error=&quot;cannot reuse a name that is still in use&quot;<br>Error: INSTALLATION FAILED: release name check failed: cannot reuse a name that is still in use<br>^C2026/07/14 01:56:56 [main] shutdown signal received, draining HTTP server<br>make: *** [Makefile:145: dev-stack] Error 130</p>",
+    "ts": "2026-07-13T23:57:22.937Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Разобрался, откуда взялась ошибка (застрявший <code class=\"inline\">pending-install</code> helm-релиз из-за прерванной установки), и вижу реальный пробел: <code class=\"inline\">InstallAgones</code> использует <code class=\"inline\">helm install</code>, который не переживает повторный вызов на кластере с уже существующим (пусть даже недоделанным) релизом. Чиню на <code class=\"inline\">helm upgrade --install</code> — идемпотентно.</p>",
+    "ts": "2026-07-14T00:05:06.327Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Проверяю прямо на сломанном кластере — переживёт ли <code class=\"inline\">helm upgrade --install</code> застрявший <code class=\"inline\">pending-install</code>.</p>",
+    "ts": "2026-07-14T00:05:21.584Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Компилируется. Теперь проверяю фикс на живом сломанном кластере — точь-в-точь воспроизводя ситуацию из бага.</p>",
+    "ts": "2026-07-14T00:07:42.059Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Теперь искусственно воспроизвожу «застрявший pending-install» (обрываю helm install на середине) и проверяю, что мой фикс восстанавливается сам.</p>",
+    "ts": "2026-07-14T00:08:29.038Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Фикс подтверждён живьём — <code class=\"inline\">InstallAgones</code> сам восстановился после искусственно застрявшего релиза. Проверяю финальное состояние кластера и прогоняю тесты.</p>",
+    "ts": "2026-07-14T00:09:19.873Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Статус <code class=\"inline\">deployed</code>, поды здоровы (старые терминируются от предыдущей неудачной попытки, новые уже <code class=\"inline\">Running</code>). Прогоняю полный набор тестов и e2e для окончательной проверки.</p>",
+    "ts": "2026-07-14T00:09:26.593Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Живой e2e (не помешал новому <code class=\"inline\">helm status</code>-запросу) — <code class=\"inline\">PASS</code>, обычный клин цикл create→ready→delete работает. Теперь полный тест-сьют репозитория.</p>",
+    "ts": "2026-07-14T00:11:40.367Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Всё чисто, порт-форвард остановлен, временные инструменты удалены. Обновляю WHATIF.md по этому багу.</p>",
+    "ts": "2026-07-14T00:13:13.960Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>Финальный прогон и проверка компиляции документации не сломала ничего.</p>",
+    "ts": "2026-07-14T00:14:08.031Z"
+  },
+  {
+    "type": "msg",
+    "who": "claude",
+    "html": "<p>## Итог</p><p>Нашёл и починил корень бага: <code class=\"inline\">HelmInstaller.InstallAgones</code> использовал голый <code class=\"inline\">helm install</code>, не переживающий повторный вызов на кластере с уже существующим (пусть даже недоделанным/застрявшим) helm-релизом.</p><p>- **Живая проверка на самом сломанном <code class=\"inline\">coordinator-asia</code>**: <code class=\"inline\">helm status</code> показал релиз в <code class=\"inline\">failed</code>/не-<code class=\"inline\">deployed</code> состоянии при полностью здоровых Kubernetes-ресурсах (поды <code class=\"inline\">Running</code>) — helm&#x27;s own bookkeeping застряло, хотя Agones реально поднялся.<br>- **Важное открытие**: <code class=\"inline\">helm upgrade --install</code> (стандартный «идемпотентный» приём) эту ситуацию **не лечит** — застрявший в процессе релиз блокирует и upgrade тоже. Спасает только <code class=\"inline\">helm uninstall</code> (работает независимо от статуса) + чистый <code class=\"inline\">helm install</code>.<br>- **Исправлено**: <code class=\"inline\">InstallAgones</code> теперь сначала спрашивает <code class=\"inline\">helm status</code> — <code class=\"inline\">deployed</code> → ничего не делает; что угодно другое → <code class=\"inline\">helm uninstall</code> затем чистый <code class=\"inline\">helm install</code>.<br>- **Проверено живьём**: искусственно оборвал <code class=\"inline\">helm install --wait</code> на реальном кластере, получил тот же битый <code class=\"inline\">failed</code>-релиз, повторный вызов исправленного <code class=\"inline\">InstallAgones</code> сам восстановился до <code class=\"inline\">STATUS: deployed</code>.<br>- Живой <code class=\"inline\">make test-e2e-provisioning</code> — <code class=\"inline\">PASS</code> (~116с), обычный чистый путь не задет.<br>- Полный <code class=\"inline\">go test ./...</code> — зелёный. <code class=\"inline\">PROJECT_MAP.md</code>/<code class=\"inline\">WHATIF.md</code> обновлены, все временные debug-инструменты удалены, порт-форвард остановлен.</p><p>Коммит-сообщение:<br>\u0000FENCE0\u0000</p>",
+    "ts": "2026-07-14T00:14:27.110Z"
   }
 ]
